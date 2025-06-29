@@ -1279,7 +1279,7 @@ input[name="currentChat"][value="none"] {
 /* ADD this rule to give the message box margins */
 .container.sidebar-hidden #mainContent #message-box {
     margin: 1rem 2rem; /* 1rem top/bottom, 2rem left/right */
-    width: calc(80% - 4rem); /* Adjust width to account for new margin */
+    width: calc(100% - 4rem); /* Adjust width to account for new margin */
 }
 
 /* Show the 'hamburger' menu button */
