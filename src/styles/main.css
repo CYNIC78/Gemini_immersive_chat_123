@@ -409,7 +409,7 @@ form {
 }
 
 .card-personality .btn-textual {
-    color: #e4e4e4;
+    color: #d1d5db;
     text-shadow: 0 0 10px #000000, 0 0 5px #181818;
 }
 
@@ -686,7 +686,7 @@ button {
     box-sizing: border-box;
     -moz-box-sizing: border-box;
     -webkit-box-sizing: border-box;
-    color: #e4e4e4;
+    color: #d1d5db;
     background-color: black;
     background-size: cover;
     background-position: center;
@@ -1120,7 +1120,7 @@ input[name="currentChat"][value="none"] {
 
     body {
         background-color: #151e24;
-        color: #e4e4e4;
+        color: #d1d5db;
     }
 
     a {
@@ -1136,7 +1136,7 @@ input[name="currentChat"][value="none"] {
     }
 
     .navbar-tab {
-        color: #e4e4e4;
+        color: #d1d5db;
     }
 
     #navbar-tab-highlight {
@@ -1162,7 +1162,7 @@ input[name="currentChat"][value="none"] {
     }
 
     .btn-textual {
-        color: #e4e4e4;
+        color: #d1d5db;
         text-shadow: 0 0 10px #000000, 0 0 5px #181818;
     }
 
@@ -1175,7 +1175,7 @@ input[name="currentChat"][value="none"] {
     select {
         background-color: #283542;
         border: 1px solid #b6b6b62f;
-        color: #e4e4e4;
+        color: #d1d5db;
     }
 
     input::placeholder,
