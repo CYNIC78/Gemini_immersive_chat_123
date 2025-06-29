@@ -264,54 +264,48 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
     }
     //handle user's message, expect encoded
     // This is the REPLACEMENT code
+// In services/Message.service.js, inside the insertMessage function...
+// REPLACE your entire 'else' block with this one:
 else {
     // Add a specific class for user messages to make styling easier
     newMessage.classList.add("message-user");
     
     const messageRole = "You:";
+    // This innerHTML is correct.
     newMessage.innerHTML = `
             <div class="message-header">
                 <h3 class="message-role">${messageRole}</h3>
                 <div class="message-actions">
                     <button class="btn-edit btn-textual material-symbols-outlined">edit</button>
                     <button class="btn-save btn-textual material-symbols-outlined" style="display: none;">save</button>
-                    
                     <button class="btn-regenerate btn-textual material-symbols-outlined" title="Regenerate response">replay</button>
                     <button class="btn-delete btn-textual material-symbols-outlined" title="Delete message">delete</button>
-
                 </div>
             </div>
             <div class="message-role-api" style="display: none;">${sender}</div>
             <div class="message-text">${helpers.getDecoded(msg)}</div>
             `;
             
-    // --- THIS IS THE NEW LOGIC ---
-    // Add the click listener for our new button
+    // --- THIS IS THE JAVASCRIPT LOGIC YOU WERE MISSING ---
+    // We must attach the listener *after* creating the button with innerHTML.
     const regenerateButton = newMessage.querySelector(".btn-regenerate");
-    regenerateButton.addEventListener("click", async () => {
-        // Find the bot's response, which is the next message in the chat
-        const botResponseElement = newMessage.nextElementSibling;
-        
-        // If there's no response after this message, do nothing
-        if (!botResponseElement || !botResponseElement.classList.contains('message-model')) {
-            console.log("No response to regenerate.");
-            return;
-        }
+    if (regenerateButton) { // Check if the button exists before adding listener
+        regenerateButton.addEventListener("click", async () => {
+            const botResponseElement = newMessage.nextElementSibling;
+            
+            if (!botResponseElement || !botResponseElement.classList.contains('message-model')) {
+                console.log("No response to regenerate.");
+                return;
+            }
 
-        // Call your existing regenerate function on the bot's response
-        try {
-            await regenerate(botResponseElement, db);
-        } catch (error) {
-            // You can use the same error handling as your other refresh button
-            alert("Error regenerating response: " + error);
-            console.error(error);
-        }
-    });
-
-    // Attach delete listener for the new message
-    const deleteButton = newMessage.querySelector(".btn-delete");
-    if (deleteButton) {
-        deleteButton.addEventListener("click", () => deleteMessage(newMessage, db));
+            try {
+                await regenerate(botResponseElement, db);
+            } catch (error) {
+                alert("Error regenerating response: " + error);
+                console.error(error);
+            }
+        });
+    }
 }
     hljs.highlightAll();
 
