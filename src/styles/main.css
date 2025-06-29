@@ -1290,16 +1290,21 @@ input[name="currentChat"][value="none"] {
 
 
 
+
+
 /* ================================================= */
 /* === MESSAGE ACTION BUTTONS (HOVER TO REVEAL) === */
 /* ================================================= */
 
 /*
-  By default, hide the Regenerate, Edit, and Delete buttons.
-  We use 'opacity: 0' to make them invisible and
-  'pointer-events: none' to make them not clickable.
+  By default, hide the action buttons. We target all of them now:
+  - .btn-regenerate (on user messages)
+  - .btn-refresh (on bot messages)
+  - .btn-edit
+  - .btn-delete
 */
 .message .btn-regenerate,
+.message .btn-refresh,
 .message .btn-edit,
 .message .btn-delete {
     opacity: 0;
@@ -1310,9 +1315,10 @@ input[name="currentChat"][value="none"] {
 
 /*
   When the user's mouse hovers over ANY message bubble (.message),
-  make the action buttons inside it slightly visible and clickable.
+  make all the action buttons inside it slightly visible and clickable.
 */
 .message:hover .btn-regenerate,
+.message:hover .btn-refresh,
 .message:hover .btn-edit,
 .message:hover .btn-delete {
     opacity: 0.7;
@@ -1324,6 +1330,7 @@ input[name="currentChat"][value="none"] {
   make it fully visible to give clear feedback.
 */
 .message .btn-regenerate:hover,
+.message .btn-refresh:hover,
 .message .btn-edit:hover,
 .message .btn-delete:hover {
     opacity: 1 !important;
@@ -1336,6 +1343,9 @@ input[name="currentChat"][value="none"] {
 .message .btn-delete:hover {
     color: #ff5c5c;
 }
+
+
+
 
 /* --- FIX FOR BROKEN MESSAGE ACTION ICONS --- */
 
