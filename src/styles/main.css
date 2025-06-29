@@ -1312,3 +1312,26 @@ input[name="currentChat"][value="none"] {
 .message-user .btn-regenerate:hover {
     opacity: 1 !important;
 }
+
+
+/* === Delete Button Styling === */
+
+.btn-delete {
+    /* Hide the button by default */
+    opacity: 0;
+    pointer-events: none;
+    font-size: 1.1rem;
+    transition: all 0.2s ease-in-out;
+}
+
+/* Show the button when hovering the message bubble */
+.message:hover .btn-delete {
+    opacity: 0.7;
+    pointer-events: auto;
+}
+
+/* Make it more obvious and turn it red on hover to indicate a destructive action */
+.btn-delete:hover {
+    opacity: 1 !important;
+    color: #ff5c5c; /* A nice, noticeable red */
+}
