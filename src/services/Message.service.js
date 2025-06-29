@@ -215,6 +215,7 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
                     <button class="btn-edit btn-textual material-symbols-outlined">edit</button>
                     <button class="btn-save btn-textual material-symbols-outlined" style="display: none;">save</button>
                     <button class="btn-refresh btn-textual material-symbols-outlined">refresh</button>
+                    <button class="btn-delete btn-textual material-symbols-outlined" title="Delete message">delete</button>
                 </div>
             </div>
             <div class="message-role-api" style="display: none;">${sender}</div>
@@ -274,8 +275,9 @@ else {
                 <div class="message-actions">
                     <button class="btn-edit btn-textual material-symbols-outlined">edit</button>
                     <button class="btn-save btn-textual material-symbols-outlined" style="display: none;">save</button>
-                    <!-- THIS IS THE NEW BUTTON -->
+                    
                     <button class="btn-regenerate btn-textual material-symbols-outlined" title="Regenerate response">
+                    <button class="btn-delete btn-textual material-symbols-outlined" title="Delete message">delete</button>
                         replay
                     </button>
                 </div>
