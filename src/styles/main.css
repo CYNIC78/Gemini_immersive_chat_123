@@ -515,7 +515,7 @@ form {
     flex-direction: column;
     gap: 0.5rem;
     padding: 1rem;
-    width: 25rem;
+    width: 20rem;
     border-radius: 1rem;
     scrollbar-width: thin;
     height: calc(100dvh - 4rem);
