@@ -1261,7 +1261,7 @@ input[name="currentChat"][value="none"] {
 
 /* MODIFY this rule to remove padding from the main container */
 .container.sidebar-hidden #mainContent {
-    max-width: 100%; /* Let it take up all the space */
+    max-width: 80%; /* Let it take up all the space */
     padding: 0; /* Remove the padding that causes the offset */
 }
 
