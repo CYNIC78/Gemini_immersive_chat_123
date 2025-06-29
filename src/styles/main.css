@@ -1239,3 +1239,20 @@ input[name="currentChat"][value="none"] {
     }
 
 }
+
+/* === Sidebar Hide/Show Logic === */
+
+/* When the sidebar is hidden... */
+.container.sidebar-hidden .sidebar {
+    display: none;
+}
+
+/* Make the main content take up more space */
+.container.sidebar-hidden #mainContent {
+    max-width: 80%; /* You can adjust this value! 80% or 90% is usually good. */
+}
+
+/* Show the 'hamburger' menu button */
+.container.sidebar-hidden #btn-show-sidebar {
+    display: block; /* Or 'flex' if it looks better */
+}
