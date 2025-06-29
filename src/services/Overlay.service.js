@@ -1,6 +1,5 @@
 import { showElement, hideElement } from '../utils/helpers';
 import * as stepperService from './Stepper.service';
-
 const overlay = document.querySelector(".overlay");
 const overlayItems = overlay.querySelector(".overlay-content").children;
 const personalityForm = document.querySelector("#form-add-personality");
