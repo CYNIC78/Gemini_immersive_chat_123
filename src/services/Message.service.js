@@ -276,7 +276,7 @@ else {
                     <button class="btn-edit btn-textual material-symbols-outlined">edit</button>
                     <button class="btn-save btn-textual material-symbols-outlined" style="display: none;">save</button>
                     
-                    <button class="btn-regenerate btn-textual material-symbols-outlined" title="Regenerate response">
+                    <button class="btn-regenerate btn-textual material-symbols-outlined" title="Regenerate response">replay</button>
                     <button class="btn-delete btn-textual material-symbols-outlined" title="Delete message">delete</button>
 
                 </div>
