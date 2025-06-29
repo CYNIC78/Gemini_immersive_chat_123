@@ -308,6 +308,54 @@ else {
     });
 }
     hljs.highlightAll();
+
+
+
+// Add this new function to services/Message.service.js
+
+async function deleteMessage(messageElement, db) {
+    // ALWAYS confirm a destructive action!
+    if (!confirm("Are you sure you want to delete this message? This cannot be undone.")) {
+        return;
+    }
+
+    try {
+        const messageContainer = document.querySelector(".message-container");
+        const messageIndex = Array.from(messageContainer.children).indexOf(messageElement);
+        const currentChat = await chatsService.getCurrentChat(db);
+
+        if (messageIndex === -1) {
+            throw new Error("Could not find message to delete.");
+        }
+        
+        let messagesToDelete = 1; // Default to deleting just this one message
+        const nextElement = messageElement.nextElementSibling;
+
+        // CRITICAL LOGIC: If we delete a user's message, we should also delete the bot's reply
+        // to it, otherwise the bot's reply will be out of context.
+        if (messageElement.classList.contains('message-user') && nextElement && nextElement.classList.contains('message-model')) {
+            messagesToDelete = 2; // We'll delete the user message AND the bot reply
+            nextElement.remove(); // Remove the bot reply from the screen
+        }
+
+        // Remove the message(s) from the chat history array
+        currentChat.content.splice(messageIndex, messagesToDelete);
+        
+        // Save the updated chat back to the database
+        await db.chats.put(currentChat);
+        
+        // Remove the primary message element from the screen
+        messageElement.remove();
+
+        console.log(`Deleted ${messagesToDelete} message(s).`);
+
+    } catch (error) {
+        console.error("Failed to delete message:", error);
+        alert("An error occurred while trying to delete the message.");
+    }
+}
+
+
     
     // Setup edit functionality for the message
     setupMessageEditing(newMessage, db);
