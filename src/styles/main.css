@@ -520,6 +520,7 @@ form {
     scrollbar-width: thin;
     height: calc(100dvh - 4rem);
     z-index: 1;
+    font-size: 0.9rem;
 }
 
 .sidebar-section {
