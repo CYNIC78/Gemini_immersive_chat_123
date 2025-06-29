@@ -307,9 +307,18 @@ else {
         });
     }
 }
+    // Attach delete listener for the new message (works for both user and bot)
+    const deleteButton = newMessage.querySelector(".btn-delete");
+    if (deleteButton) {
+        deleteButton.addEventListener("click", () => deleteMessage(newMessage, db));
+    }
+    // --- END OF NEW BLOCK ---
+
     hljs.highlightAll();
-
-
+    
+    // Setup edit functionality for the message
+    setupMessageEditing(newMessage, db);
+}
 
 // Add this new function to services/Message.service.js
 
@@ -355,8 +364,3 @@ async function deleteMessage(messageElement, db) {
     }
 }
 
-
-    
-    // Setup edit functionality for the message
-    setupMessageEditing(newMessage, db);
-}
