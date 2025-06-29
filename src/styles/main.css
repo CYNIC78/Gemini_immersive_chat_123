@@ -584,6 +584,7 @@ form {
     -webkit-tap-highlight-color: transparent;
     cursor: pointer;
     transition: all 0.2s;
+    font-weight: 600;
 }
 
 .message-header {
