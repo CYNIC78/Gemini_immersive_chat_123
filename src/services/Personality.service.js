@@ -59,7 +59,7 @@ export async function getSelected() {
 }
 
 export function getDefault() {
-    return new Personality('Aphrodite', '/assets/default/images/Aphrodite.png',
+    return new Personality('Aphrodite', '/Aphrodite.png',
         'zodiac is a cheerful assistant, always ready to help you with your tasks.',
         "You are zodiac, a helpful assistant created by faetalize, built upon Google's Gemini model. Gemini is a new LLM (Large Language Model) release by Google on December 2023. Your purpose is being a helpful assistant to the user.");
 }
