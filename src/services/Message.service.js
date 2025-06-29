@@ -197,6 +197,10 @@ async function updateMessageInDatabase(messageElement, messageIndex, db) {
     }
 }
 
+
+
+
+
 export async function insertMessage(sender, msg, selectedPersonalityTitle = null, netStream = null, db = null, pfpSrc = null) {
     //create new message div for the user's message then append to message container's top
     const newMessage = document.createElement("div");
@@ -253,7 +257,7 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
                 }
                 hljs.highlightAll();
                 helpers.messageContainerScrollToBottom();
-                setupMessageEditing(newMessage, db);
+                //setupMessageEditing(newMessage, db);
                 return { HTML: messageContent.innerHTML, md: rawText };
             } catch (error) {
                 alert("Error processing response: " + error);
@@ -289,38 +293,33 @@ else {
     // --- THIS IS THE JAVASCRIPT LOGIC YOU WERE MISSING ---
     // We must attach the listener *after* creating the button with innerHTML.
     const regenerateButton = newMessage.querySelector(".btn-regenerate");
-    if (regenerateButton) { // Check if the button exists before adding listener
+    if (regenerateButton) {
         regenerateButton.addEventListener("click", async () => {
             const botResponseElement = newMessage.nextElementSibling;
-            
-            if (!botResponseElement || !botResponseElement.classList.contains('message-model')) {
-                console.log("No response to regenerate.");
-                return;
-            }
-
-            try {
+            if (botResponseElement && botResponseElement.classList.contains('message-model')) {
                 await regenerate(botResponseElement, db);
-            } catch (error) {
-                alert("Error regenerating response: " + error);
-                console.error(error);
             }
         });
     }
-}
-    // Attach delete listener for the new message (works for both user and bot)
+
+    // Attach listener for the Delete button (if it exists)
     const deleteButton = newMessage.querySelector(".btn-delete");
     if (deleteButton) {
         deleteButton.addEventListener("click", () => deleteMessage(newMessage, db));
     }
-    // --- END OF NEW BLOCK ---
 
+    // This part you already had, keep it here.
     hljs.highlightAll();
-    
-    // Setup edit functionality for the message
     setupMessageEditing(newMessage, db);
 }
 
+
+
+
+    
 // Add this new function to services/Message.service.js
+
+// REPLACE your old deleteMessage function with this new one.
 
 async function deleteMessage(messageElement, db) {
     // ALWAYS confirm a destructive action!
@@ -330,33 +329,36 @@ async function deleteMessage(messageElement, db) {
 
     try {
         const messageContainer = document.querySelector(".message-container");
-        const messageIndex = Array.from(messageContainer.children).indexOf(messageElement);
         const currentChat = await chatsService.getCurrentChat(db);
+        
+        // Find the index of the message in the DOM to find it in the database
+        const messageIndex = Array.from(messageContainer.children).indexOf(messageElement);
 
         if (messageIndex === -1) {
             throw new Error("Could not find message to delete.");
         }
         
-        let messagesToDelete = 1; // Default to deleting just this one message
+        let messagesToDelete = 1;
         const nextElement = messageElement.nextElementSibling;
 
-        // CRITICAL LOGIC: If we delete a user's message, we should also delete the bot's reply
-        // to it, otherwise the bot's reply will be out of context.
+        // If we delete a user's message, we also delete the bot's reply that follows it.
         if (messageElement.classList.contains('message-user') && nextElement && nextElement.classList.contains('message-model')) {
-            messagesToDelete = 2; // We'll delete the user message AND the bot reply
-            nextElement.remove(); // Remove the bot reply from the screen
+            messagesToDelete = 2;
         }
 
-        // Remove the message(s) from the chat history array
+        // Remove the message(s) from the chat history array in the database
         currentChat.content.splice(messageIndex, messagesToDelete);
         
         // Save the updated chat back to the database
         await db.chats.put(currentChat);
         
-        // Remove the primary message element from the screen
-        messageElement.remove();
+        // --- THE ROBUST FIX ---
+        // Instead of manually removing from the screen, we tell the chat service
+        // to reload the entire chat from the now-correct database state.
+        // This guarantees the UI and data are always in sync.
+        await chatsService.loadChat(currentChat.id, db);
 
-        console.log(`Deleted ${messagesToDelete} message(s).`);
+        console.log(`Deleted ${messagesToDelete} message(s) and reloaded chat.`);
 
     } catch (error) {
         console.error("Failed to delete message:", error);
