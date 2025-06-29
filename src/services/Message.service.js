@@ -308,6 +308,11 @@ else {
             console.error(error);
         }
     });
+
+    // Attach delete listener for the new message
+    const deleteButton = newMessage.querySelector(".btn-delete");
+    if (deleteButton) {
+        deleteButton.addEventListener("click", () => deleteMessage(newMessage, db));
 }
     hljs.highlightAll();
 
