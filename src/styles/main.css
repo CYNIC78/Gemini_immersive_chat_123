@@ -1287,3 +1287,28 @@ input[name="currentChat"][value="none"] {
 .container.sidebar-hidden #btn-show-sidebar {
     display: block; /* Or 'flex' if it looks better */
 }
+
+
+
+/* === Regenerate Button Styling === */
+
+/* When the user hovers over ANY part of their message bubble... */
+.message-user:hover .btn-regenerate {
+    /* ...make the button visible and clickable. */
+    opacity: 0.7;
+    pointer-events: auto;
+}
+
+/* This targets the button inside the user's message bubble */
+.message-user .btn-regenerate {
+    /* Hide the button by default */
+    opacity: 0;
+    pointer-events: none;
+    font-size: 1.1rem;
+    transition: opacity 0.2s ease-in-out;
+}
+
+/* Make it slightly more obvious when hovering the button directly */
+.message-user .btn-regenerate:hover {
+    opacity: 1 !important;
+}
