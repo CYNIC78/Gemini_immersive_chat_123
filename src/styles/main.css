@@ -1335,3 +1335,12 @@ input[name="currentChat"][value="none"] {
     opacity: 1 !important;
     color: #ff5c5c; /* A nice, noticeable red */
 }
+
+/* --- FIX FOR BROKEN MESSAGE ACTION ICONS --- */
+
+/* This rule is more specific and forces the correct font on the action buttons */
+.message-actions .btn-textual.material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-size: 1.1rem; /* You can adjust this size */
+    font-weight: normal; /* Important for icons */
+}
