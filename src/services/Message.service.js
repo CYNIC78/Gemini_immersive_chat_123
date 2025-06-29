@@ -2,10 +2,12 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { marked } from "marked";
+import hljs from "highlight.js";
 import * as settingsService from "./Settings.service.js";
 import * as personalityService from "./Personality.service.js";
 import * as chatsService from "./Chats.service.js";
 import * as helpers from "../utils/helpers.js";
+
 
 export async function send(msg, db) {
     const settings = settingsService.getSettings();
