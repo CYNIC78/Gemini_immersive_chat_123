@@ -200,17 +200,18 @@ async function updateMessageInDatabase(messageElement, messageIndex, db) {
 
 
 
-
 export async function insertMessage(sender, msg, selectedPersonalityTitle = null, netStream = null, db = null, pfpSrc = null) {
-    //create new message div for the user's message then append to message container's top
+    // Create new message div for the user's message then append to message container's top
     const newMessage = document.createElement("div");
     newMessage.classList.add("message");
     const messageContainer = document.querySelector(".message-container");
     messageContainer.append(newMessage);
-    //handle model's message
+
+    // Handle model's message
     if (sender != "user") {
         newMessage.classList.add("message-model");
         const messageRole = selectedPersonalityTitle;
+
         newMessage.innerHTML = `
             <div class="message-header">
                 <img class="pfp" src="${pfpSrc}" loading="lazy"></img>
@@ -224,11 +225,12 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
             </div>
             <div class="message-role-api" style="display: none;">${sender}</div>
             <div class="message-text"></div>
-            `;
+        `;
+
         const refreshButton = newMessage.querySelector(".btn-refresh");
         refreshButton.addEventListener("click", async () => {
             try {
-                await regenerate(newMessage, db)
+                await regenerate(newMessage, db);
             } catch (error) {
                 if (error.status === 429) {
                     alert("Error, you have reached the API's rate limit. Please try again later or use the Flash model.");
@@ -238,26 +240,23 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
                 console.error(error);
             }
         });
+
         const messageContent = newMessage.querySelector(".message-text");
-        //no streaming necessary if not receiving answer
+
         if (!netStream) {
             messageContent.innerHTML = marked.parse(msg);
-        }
-        else {
+        } else {
             let rawText = "";
             try {
-                // In the new API, we receive an iterable stream
                 for await (const chunk of netStream) {
-                    // The chunks will have text property that contains content
                     if (chunk && chunk.text) {
                         rawText += chunk.text;
-                        messageContent.innerHTML = marked.parse(rawText, { breaks: true }); //convert md to HTML
+                        messageContent.innerHTML = marked.parse(rawText, { breaks: true });
                         helpers.messageContainerScrollToBottom();
                     }
                 }
                 hljs.highlightAll();
                 helpers.messageContainerScrollToBottom();
-                //setupMessageEditing(newMessage, db);
                 return { HTML: messageContent.innerHTML, md: rawText };
             } catch (error) {
                 alert("Error processing response: " + error);
@@ -265,18 +264,12 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
                 return { HTML: messageContent.innerHTML, md: rawText };
             }
         }
-    }
-    //handle user's message, expect encoded
-    // This is the REPLACEMENT code
-// In services/Message.service.js, inside the insertMessage function...
-// REPLACE your entire 'else' block with this one:
-else {
-    // Add a specific class for user messages to make styling easier
-    newMessage.classList.add("message-user");
-    
-    const messageRole = "You:";
-    // This innerHTML is correct.
-    newMessage.innerHTML = `
+    } else {
+        // Add a specific class for user messages to make styling easier
+        newMessage.classList.add("message-user");
+
+        const messageRole = "You:";
+        newMessage.innerHTML = `
             <div class="message-header">
                 <h3 class="message-role">${messageRole}</h3>
                 <div class="message-actions">
@@ -288,29 +281,26 @@ else {
             </div>
             <div class="message-role-api" style="display: none;">${sender}</div>
             <div class="message-text">${helpers.getDecoded(msg)}</div>
-            `;
-            
-    // --- THIS IS THE JAVASCRIPT LOGIC YOU WERE MISSING ---
-    // We must attach the listener *after* creating the button with innerHTML.
-    const regenerateButton = newMessage.querySelector(".btn-regenerate");
-    if (regenerateButton) {
-        regenerateButton.addEventListener("click", async () => {
-            const botResponseElement = newMessage.nextElementSibling;
-            if (botResponseElement && botResponseElement.classList.contains('message-model')) {
-                await regenerate(botResponseElement, db);
-            }
-        });
-    }
+        `;
 
-    // Attach listener for the Delete button (if it exists)
-    const deleteButton = newMessage.querySelector(".btn-delete");
-    if (deleteButton) {
-        deleteButton.addEventListener("click", () => deleteMessage(newMessage, db));
-    }
+        const regenerateButton = newMessage.querySelector(".btn-regenerate");
+        if (regenerateButton) {
+            regenerateButton.addEventListener("click", async () => {
+                const botResponseElement = newMessage.nextElementSibling;
+                if (botResponseElement && botResponseElement.classList.contains('message-model')) {
+                    await regenerate(botResponseElement, db);
+                }
+            });
+        }
 
-    // This part you already had, keep it here.
-    hljs.highlightAll();
-    setupMessageEditing(newMessage, db);
+        const deleteButton = newMessage.querySelector(".btn-delete");
+        if (deleteButton) {
+            deleteButton.addEventListener("click", () => deleteMessage(newMessage, db));
+        }
+
+        hljs.highlightAll();
+        setupMessageEditing(newMessage, db);
+    }
 }
 
 
