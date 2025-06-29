@@ -785,7 +785,7 @@ button {
 }
 
 .card-personality:has(input[name="personality"]:checked) {
-    min-height: 10rem;
+    aspect-ratio: 1/* min-height: 10rem; */
     text-wrap: wrap;
     flex-direction: column;
     justify-content: space-between;
