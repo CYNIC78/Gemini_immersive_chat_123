@@ -1,3 +1,43 @@
+// Wait for the page content to be fully loaded before running script
+document.addEventListener('DOMContentLoaded', () => {
+
+    // Select the elements we need to work with
+    const container = document.querySelector('.container');
+    const btnHideSidebar = document.querySelector('#btn-hide-sidebar');
+    const btnShowSidebar = document.querySelector('#btn-show-sidebar');
+
+    // --- Sidebar Toggle Logic ---
+
+    // When the "Hide" button is clicked...
+    btnHideSidebar.addEventListener('click', () => {
+        container.classList.add('sidebar-hidden');
+        // Optional: Save the state so the browser remembers
+        localStorage.setItem('sidebarState', 'hidden');
+    });
+
+    // When the "Show" button is clicked...
+    btnShowSidebar.addEventListener('click', () => {
+        container.classList.remove('sidebar-hidden');
+        // Optional: Save the state so the browser remembers
+        localStorage.setItem('sidebarState', 'visible');
+    });
+
+    // --- Check for saved state on page load ---
+    // This makes the page remember if the sidebar was hidden on the last visit
+    if (localStorage.getItem('sidebarState') === 'hidden') {
+        container.classList.add('sidebar-hidden');
+    }
+
+    /* 
+       ... ALL YOUR OTHER main.js CODE CAN GO HERE,
+       INSIDE THE DOMContentLoaded LISTENER ...
+    */
+
+});
+
+
+
+
 
 import * as personalityService from "./services/Personality.service";
 import * as settingsService from "./services/Settings.service";
