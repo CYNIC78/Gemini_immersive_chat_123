@@ -278,8 +278,7 @@ else {
                     
                     <button class="btn-regenerate btn-textual material-symbols-outlined" title="Regenerate response">
                     <button class="btn-delete btn-textual material-symbols-outlined" title="Delete message">delete</button>
-                        replay
-                    </button>
+
                 </div>
             </div>
             <div class="message-role-api" style="display: none;">${sender}</div>
