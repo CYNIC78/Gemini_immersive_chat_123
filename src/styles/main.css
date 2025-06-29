@@ -1290,50 +1290,51 @@ input[name="currentChat"][value="none"] {
 
 
 
-/* === Regenerate Button Styling === */
+/* ================================================= */
+/* === MESSAGE ACTION BUTTONS (HOVER TO REVEAL) === */
+/* ================================================= */
 
-/* When the user hovers over ANY part of their message bubble... */
-.message-user:hover .btn-regenerate {
-    /* ...make the button visible and clickable. */
-    opacity: 0.7;
-    pointer-events: auto;
-}
-
-/* This targets the button inside the user's message bubble */
-.message-user .btn-regenerate {
-    /* Hide the button by default */
+/*
+  By default, hide the Regenerate, Edit, and Delete buttons.
+  We use 'opacity: 0' to make them invisible and
+  'pointer-events: none' to make them not clickable.
+*/
+.message .btn-regenerate,
+.message .btn-edit,
+.message .btn-delete {
     opacity: 0;
     pointer-events: none;
-    font-size: 1.1rem;
+    font-size: 1.1rem; /* A nice, consistent size for the icons */
     transition: opacity 0.2s ease-in-out;
 }
 
-/* Make it slightly more obvious when hovering the button directly */
-.message-user .btn-regenerate:hover {
-    opacity: 1 !important;
-}
-
-
-/* === Delete Button Styling === */
-
-.btn-delete {
-    /* Hide the button by default */
-    opacity: 0;
-    pointer-events: none;
-    font-size: 1.1rem;
-    transition: all 0.2s ease-in-out;
-}
-
-/* Show the button when hovering the message bubble */
+/*
+  When the user's mouse hovers over ANY message bubble (.message),
+  make the action buttons inside it slightly visible and clickable.
+*/
+.message:hover .btn-regenerate,
+.message:hover .btn-edit,
 .message:hover .btn-delete {
     opacity: 0.7;
     pointer-events: auto;
 }
 
-/* Make it more obvious and turn it red on hover to indicate a destructive action */
-.btn-delete:hover {
+/*
+  When the user hovers directly over one of the buttons,
+  make it fully visible to give clear feedback.
+*/
+.message .btn-regenerate:hover,
+.message .btn-edit:hover,
+.message .btn-delete:hover {
     opacity: 1 !important;
-    color: #ff5c5c; /* A nice, noticeable red */
+}
+
+/*
+  Give the delete button a special red color on its own hover
+  to warn the user that it's a destructive action.
+*/
+.message .btn-delete:hover {
+    color: #ff5c5c;
 }
 
 /* --- FIX FOR BROKEN MESSAGE ACTION ICONS --- */
