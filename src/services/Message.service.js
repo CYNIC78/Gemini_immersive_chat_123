@@ -1,6 +1,6 @@
-//handles sending messages to the api
+// handles sending messages to the api
 
-import { GoogleGenAI } from "@google/genai"
+import { GoogleGenAI } from "@google/genai";
 import { marked } from "marked";
 import * as settingsService from "./Settings.service.js";
 import * as personalityService from "./Personality.service.js";
@@ -20,7 +20,7 @@ export async function send(msg, db) {
     if (!msg) {
         return;
     }
-    //model setup
+
     const ai = new GoogleGenAI({ apiKey: settings.apiKey });
     const config = {
         maxOutputTokens: parseInt(settings.maxTokens),
@@ -29,10 +29,8 @@ export async function send(msg, db) {
         safetySettings: settings.safetySettings,
         responseMimeType: "text/plain"
     };
-    
-    //user msg handling
-    //we create a new chat if there is none is currently selected
-    if (!await chatsService.getCurrentChat(db)) { 
+
+    if (!await chatsService.getCurrentChat(db)) {
         const response = await ai.models.generateContent({
             model: 'gemini-2.0-flash',
             contents: "You are to act as a generator for chat titles. The user will send a query - you must generate a title for the chat based on it. Only reply with the short title, nothing else. The user's message is: " + msg,
@@ -41,12 +39,10 @@ export async function send(msg, db) {
         const id = await chatsService.addChat(title, null, db);
         document.querySelector(`#chat${id}`).click();
     }
+
     await insertMessage("user", msg, null, null, db);
     helpers.messageContainerScrollToBottom();
-    //model reply
-    
-    
-    // Create chat history
+
     const history = [
         {
             role: "user",
@@ -57,38 +53,28 @@ export async function send(msg, db) {
             parts: [{ text: "okie dokie. from now on, I will be acting as the personality you have chosen" }]
         }
     ];
-    
-    // Add tone examples if available
+
     if (selectedPersonality.toneExamples) {
-        history.push(
-            ...selectedPersonality.toneExamples.map((tone) => {
-                return { role: "model", parts: [{ text: tone }] }
-            })
-        );
+        history.push(...selectedPersonality.toneExamples.map((tone) => {
+            return { role: "model", parts: [{ text: tone }] };
+        }));
     }
-    
-    // Add chat history
+
     const currentChat = await chatsService.getCurrentChat(db);
-    history.push(
-        ...currentChat.content.map((msg) => {
-            return { role: msg.role, parts: msg.parts } //we remove the `personality` property as the API expects only `role` and `parts`
-        })
-    );
-    
-    // Create chat session
+    history.push(...currentChat.content.map((msg) => {
+        return { role: msg.role, parts: msg.parts };
+    }));
+
     const chat = ai.chats.create({
         model: settings.model,
         history: history,
         config: config
     });
-    
-    // Send message with streaming
-    const stream = await chat.sendMessageStream({
-        message: msg
-    });
-    
+
+    const stream = await chat.sendMessageStream({ message: msg });
+
     const reply = await insertMessage("model", "", selectedPersonality.name, stream, db, selectedPersonality.image);
-    //save chat history and settings
+
     currentChat.content.push({ role: "user", parts: [{ text: msg }] });
     currentChat.content.push({ role: "model", personality: selectedPersonality.name, personalityid: selectedPersonality.id, parts: [{ text: reply.md }] });
     await db.chats.put(currentChat);
@@ -96,7 +82,6 @@ export async function send(msg, db) {
 }
 
 async function regenerate(responseElement, db) {
-    //basically, we remove every message after the response we wish to regenerate, then send the message again.
     const message = responseElement.previousElementSibling.querySelector(".message-text").textContent;
     const elementIndex = [...responseElement.parentElement.children].indexOf(responseElement);
     const chat = await chatsService.getCurrentChat(db);
@@ -107,29 +92,22 @@ async function regenerate(responseElement, db) {
     await send(message, db);
 }
 
-
-
 function setupMessageEditing(messageElement, db) {
     const editButton = messageElement.querySelector(".btn-edit");
     const saveButton = messageElement.querySelector(".btn-save");
     const messageText = messageElement.querySelector(".message-text");
-    
+
     if (!editButton || !saveButton) return;
-    
-    // Handle edit button click
+
     editButton.addEventListener("click", () => {
-        // Enable editing
         messageText.setAttribute("contenteditable", "true");
         messageText.focus();
-        
-        // Show save button, hide edit button
+
         editButton.style.display = "none";
         saveButton.style.display = "inline-block";
-        
-        // Store original content to allow cancellation
+
         messageText.dataset.originalContent = messageText.innerHTML;
-        
-        // Place cursor at the end
+
         const selection = window.getSelection();
         const range = document.createRange();
         range.selectNodeContents(messageText);
@@ -137,33 +115,24 @@ function setupMessageEditing(messageElement, db) {
         selection.removeAllRanges();
         selection.addRange(range);
     });
-    
-    // Handle save button click
+
     saveButton.addEventListener("click", async () => {
-        // Disable editing
         messageText.removeAttribute("contenteditable");
-        
-        // Show edit button, hide save button
         editButton.style.display = "inline-block";
         saveButton.style.display = "none";
-        
-        // Get the message index to update the correct message in chat history
+
         const messageContainer = document.querySelector(".message-container");
         const messageIndex = Array.from(messageContainer.children).indexOf(messageElement);
-        
-        // Update the chat history in database
+
         await updateMessageInDatabase(messageElement, messageIndex, db);
     });
-    
-    // Handle keydown events in the editable message
+
     messageText.addEventListener("keydown", (e) => {
-        // Save on Enter key (without shift for newlines)
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             saveButton.click();
         }
-        
-        // Cancel on Escape key
+
         if (e.key === "Escape") {
             messageText.innerHTML = messageText.dataset.originalContent;
             messageText.removeAttribute("contenteditable");
@@ -175,20 +144,16 @@ function setupMessageEditing(messageElement, db) {
 
 async function updateMessageInDatabase(messageElement, messageIndex, db) {
     if (!db) return;
-    
+
     try {
-        // Get the updated message text
         const messageText = messageElement.querySelector(".message-text").innerHTML;
-        const rawText = messageText.replace(/<[^>]*>/g, "").trim(); // Strip HTML for storing in parts
-        
-        // Get the current chat and update the specific message
+        const rawText = messageText.replace(/<[^>]*>/g, "").trim();
+
         const currentChat = await chatsService.getCurrentChat(db);
         if (!currentChat || !currentChat.content[messageIndex]) return;
-        
-        // Update the message content in the parts array
+
         currentChat.content[messageIndex].parts[0].text = rawText;
-        
-        // Save the updated chat back to the database
+
         await db.chats.put(currentChat);
         console.log("Message updated in database");
     } catch (error) {
@@ -197,17 +162,12 @@ async function updateMessageInDatabase(messageElement, messageIndex, db) {
     }
 }
 
-
-
-
 export async function insertMessage(sender, msg, selectedPersonalityTitle = null, netStream = null, db = null, pfpSrc = null) {
-    // Create new message div for the user's message then append to message container's top
     const newMessage = document.createElement("div");
     newMessage.classList.add("message");
     const messageContainer = document.querySelector(".message-container");
     messageContainer.append(newMessage);
 
-    // Handle model's message
     if (sender != "user") {
         newMessage.classList.add("message-model");
         const messageRole = selectedPersonalityTitle;
@@ -265,7 +225,6 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
             }
         }
     } else {
-        // Add a specific class for user messages to make styling easier
         newMessage.classList.add("message-user");
 
         const messageRole = "You:";
@@ -303,16 +262,7 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
     }
 }
 
-
-
-
-    
-// Add this new function to services/Message.service.js
-
-// REPLACE your old deleteMessage function with this new one.
-
 async function deleteMessage(messageElement, db) {
-    // ALWAYS confirm a destructive action!
     if (!confirm("Are you sure you want to delete this message? This cannot be undone.")) {
         return;
     }
@@ -320,32 +270,22 @@ async function deleteMessage(messageElement, db) {
     try {
         const messageContainer = document.querySelector(".message-container");
         const currentChat = await chatsService.getCurrentChat(db);
-        
-        // Find the index of the message in the DOM to find it in the database
+
         const messageIndex = Array.from(messageContainer.children).indexOf(messageElement);
 
         if (messageIndex === -1) {
             throw new Error("Could not find message to delete.");
         }
-        
+
         let messagesToDelete = 1;
         const nextElement = messageElement.nextElementSibling;
 
-        // If we delete a user's message, we also delete the bot's reply that follows it.
         if (messageElement.classList.contains('message-user') && nextElement && nextElement.classList.contains('message-model')) {
             messagesToDelete = 2;
         }
 
-        // Remove the message(s) from the chat history array in the database
         currentChat.content.splice(messageIndex, messagesToDelete);
-        
-        // Save the updated chat back to the database
         await db.chats.put(currentChat);
-        
-        // --- THE ROBUST FIX ---
-        // Instead of manually removing from the screen, we tell the chat service
-        // to reload the entire chat from the now-correct database state.
-        // This guarantees the UI and data are always in sync.
         await chatsService.loadChat(currentChat.id, db);
 
         console.log(`Deleted ${messagesToDelete} message(s) and reloaded chat.`);
@@ -355,4 +295,3 @@ async function deleteMessage(messageElement, db) {
         alert("An error occurred while trying to delete the message.");
     }
 }
-
