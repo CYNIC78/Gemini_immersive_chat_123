@@ -201,6 +201,7 @@ async function updateMessageInDatabase(messageElement, messageIndex, db) {
 
 
 // REPLACE your old insertMessage function with this new one.
+// REPLACE your insertMessage function with this final version.
 export async function insertMessage(sender, msg, selectedPersonalityTitle = null, netStream = null, db = null, pfpSrc = null) {
     // Create new message div for the user's message then append to message container's top
     const newMessage = document.createElement("div");
@@ -220,7 +221,7 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
                 <div class="message-actions">
                     <button class="btn-edit btn-textual material-symbols-outlined">edit</button>
                     <button class="btn-save btn-textual material-symbols-outlined" style="display: none;">save</button>
-                    <button class="btn-refresh btn-textual material-symbols-outlined">refresh</button>
+                    <button class="btn-refresh btn-textual material-symbols-outlined" title="Regenerate response">refresh</button>
                     <button class="btn-delete btn-textual material-symbols-outlined" title="Delete message">delete</button>
                 </div>
             </div>
@@ -242,8 +243,6 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
             }
         });
 
-        // *** THIS IS THE FIX for the bot message ***
-        // We add the event listener to the delete button on bot messages too.
         const deleteButton = newMessage.querySelector(".btn-delete");
         if (deleteButton) {
             deleteButton.addEventListener("click", () => deleteMessage(newMessage, db));
@@ -265,7 +264,7 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
                 }
                 hljs.highlightAll();
                 helpers.messageContainerScrollToBottom();
-                setupMessageEditing(newMessage, db); // We also enable editing for bot messages now
+                setupMessageEditing(newMessage, db); 
                 return { HTML: messageContent.innerHTML, md: rawText };
             } catch (error) {
                 alert("Error processing response: " + error);
@@ -273,7 +272,7 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
                 return { HTML: messageContent.innerHTML, md: rawText };
             }
         }
-        setupMessageEditing(newMessage, db); // And here, for non-streamed bot messages
+        setupMessageEditing(newMessage, db);
     } else {
         // Add a specific class for user messages to make styling easier
         newMessage.classList.add("message-user");
@@ -285,7 +284,10 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
                 <div class="message-actions">
                     <button class="btn-edit btn-textual material-symbols-outlined">edit</button>
                     <button class="btn-save btn-textual material-symbols-outlined" style="display: none;">save</button>
-                    <button class="btn-regenerate btn-textual material-symbols-outlined" title="Regenerate response">replay</button>
+                    
+                    <!-- *** THIS ICON IS NOW 'refresh' INSTEAD OF 'replay' *** -->
+                    <button class="btn-regenerate btn-textual material-symbols-outlined" title="Regenerate response">refresh</button>
+                    
                     <button class="btn-delete btn-textual material-symbols-outlined" title="Delete message">delete</button>
                 </div>
             </div>
@@ -303,7 +305,6 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
             });
         }
 
-        // The listener for the user's delete button was already correct.
         const deleteButton = newMessage.querySelector(".btn-delete");
         if (deleteButton) {
             deleteButton.addEventListener("click", () => deleteMessage(newMessage, db));
@@ -313,7 +314,6 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
         setupMessageEditing(newMessage, db);
     }
 }
-
 
 
     
