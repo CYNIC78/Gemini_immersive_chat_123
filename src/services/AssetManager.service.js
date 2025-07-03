@@ -99,11 +99,21 @@ function createAssetCard(asset) {
     // --- Event Listeners for the card ---
     const tagsInput = card.querySelector('.asset-tags-input');
     tagsInput.addEventListener('change', () => {
-        // Update the tags in our temporary array when the input changes
         asset.tags = tagsInput.value.split(',').map(tag => tag.trim()).filter(Boolean);
     });
     
-    // We will add the delete button functionality later.
+    // --- NEW: Delete button functionality ---
+    const deleteBtn = card.querySelector('.btn-delete-asset');
+    deleteBtn.addEventListener('click', () => {
+        if (confirm(`Are you sure you want to delete "${asset.filename}"?`)) {
+            // Find the index of the asset to delete in the main array
+            const indexToDelete = currentAssets.findIndex(a => a.id === asset.id);
+            if (indexToDelete > -1) {
+                currentAssets.splice(indexToDelete, 1); // Remove it
+            }
+            renderGallery(); // Re-render the gallery to show the change
+        }
+    });
 
     return card;
 }
@@ -127,12 +137,10 @@ function addGroup() {
 function handleUpload() {
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
-    // For now, we only accept images. We'll add audio later.
     fileInput.accept = 'image/png, image/jpeg, image/gif';
-    fileInput.multiple = true; // Allow selecting multiple files
+    fileInput.multiple = true;
 
     fileInput.addEventListener('change', () => {
-        // A "real" array from the FileList
         const files = Array.from(fileInput.files);
         
         files.forEach(file => {
@@ -140,28 +148,27 @@ function handleUpload() {
             reader.onload = (e) => {
                 const base64Data = e.target.result;
                 const newAsset = {
-                    id: `asset-${Date.now()}-${Math.random()}`, // Unique ID
+                    id: `asset-${Date.now()}-${Math.random()}`,
                     filename: file.name,
-                    type: 'image', // Hardcoded for now
+                    type: 'image',
                     group: activeGroupName === 'All Assets' ? 'Unsorted' : activeGroupName,
                     tags: [],
                     base64Data: base64Data
                 };
 
-                // If uploading to "All Assets", and "Unsorted" group doesn't exist, create it.
                 if (newAsset.group === 'Unsorted' && !currentGroups.includes('Unsorted')) {
                     currentGroups.push('Unsorted');
                     renderGroups();
                 }
 
                 currentAssets.push(newAsset);
-                renderGallery(); // Re-render the gallery to show the new asset
+                renderGallery();
             };
-            reader.readAsDataURL(file); // This triggers the 'onload' event
+            reader.readAsDataURL(file);
         });
     });
 
-    fileInput.click(); // Open the file selection dialog
+    fileInput.click();
 }
 
 // Attach event listeners to the buttons
