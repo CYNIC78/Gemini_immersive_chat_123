@@ -6,29 +6,62 @@ import * as chatsService from "./Chats.service.js";
 import * as helpers from "../utils/helpers.js";
 import * as characterScriptService from "./CharacterScript.service.js";
 
+// --- NEW: Control the speed of the typing effect (milliseconds per word) ---
+const STREAM_DELAY_MS = 50; // Try values between 30 and 150
+
 // --- Core Helper Functions ---
+
+/**
+ * Creates a "typewriter" effect by rendering words one by one.
+ * @param {ReadableStream} stream - The stream from the Gemini API.
+ * @param {HTMLElement} textElement - The HTML element to type into.
+ * @returns {Promise<string>} - A promise that resolves with the full raw text.
+ */
+function typewriterStream(stream, textElement) {
+    return new Promise(async (resolve) => {
+        let wordBuffer = [];
+        let fullText = "";
+        let isStreaming = true;
+
+        const writer = setInterval(() => {
+            if (wordBuffer.length > 0) {
+                fullText += wordBuffer.shift() + " ";
+                textElement.innerHTML = marked.parse(fullText, { breaks: true });
+                helpers.messageContainerScrollToBottom();
+            } else if (!isStreaming) {
+                // Buffer is empty and the stream is done
+                clearInterval(writer);
+                hljs.highlightAll(); // Highlight code at the very end
+                resolve(fullText); // Resolve the promise with the complete text
+            }
+        }, STREAM_DELAY_MS);
+
+        try {
+            for await (const chunk of stream) {
+                const words = chunk.text().split(/\s+/).filter(Boolean);
+                wordBuffer.push(...words);
+            }
+        } catch (error) {
+            console.error("Stream error:", error);
+            textElement.innerHTML += `<br><br><strong style='color:red;'>Error during stream. Check console (F12).</strong>`;
+        } finally {
+            isStreaming = false; // Signal that the stream has finished
+        }
+    });
+}
+
 
 async function streamAndProcessResponse(stream, personality, userMessage, targetElement = null) {
     let placeholder = targetElement;
     if (!placeholder) {
-        // If no target is provided (for new messages), create one.
         placeholder = await insertMessage({ role: 'model', versions: [{text:''}] }, -1, null, personality);
     }
     const textElement = placeholder.querySelector('.message-text');
-    let rawText = "";
+    
+    // Start the typewriter effect and wait for the full text
+    const rawText = await typewriterStream(stream, textElement);
 
-    try {
-        for await (const chunk of stream) {
-            rawText += chunk.text();
-            textElement.innerHTML = marked.parse(rawText, { breaks: true });
-            helpers.messageContainerScrollToBottom();
-        }
-    } catch (error) {
-        console.error("Stream error:", error);
-        textElement.innerHTML += `<br><br><strong style='color:red;'>Error during stream. Check console (F12).</strong>`;
-    }
-    hljs.highlightAll();
-
+    // Now that we have the full text, process it
     let modifiedText = rawText;
     let finalImage = personalityService.findDefaultAvatar(personality);
 
@@ -47,6 +80,7 @@ async function streamAndProcessResponse(stream, personality, userMessage, target
     }
 
     placeholder.querySelector('.pfp').src = finalImage;
+    // Update the text element one last time in case the script modified it
     textElement.innerHTML = marked.parse(modifiedText, { breaks: true });
     hljs.highlightAll();
 
@@ -117,8 +151,8 @@ async function regenerate(messageIndex, db) {
     let currentChat = await chatsService.getCurrentChat(db);
     
     const messageElement = document.querySelector(`.message[data-index="${messageIndex}"]`);
-    messageElement.querySelector('.message-text').innerHTML = "<i>Regenerating...</i>";
-
+    messageElement.querySelector('.message-text').innerHTML = ""; // Clear for typing
+    
     const userMessageText = messageIndex === 0 
         ? (selectedPersonality.firstMessagePrompt || "")
         : currentChat.content[messageIndex - 1].parts[0].text;
@@ -133,7 +167,6 @@ async function regenerate(messageIndex, db) {
     
     const result = await model.generateContentStream({ contents });
     
-    // Stream the response directly into the existing message element
     const newVersionData = await streamAndProcessResponse(result.stream, selectedPersonality, userMessageText, messageElement);
 
     const modelMessage = currentChat.content[messageIndex];
@@ -141,18 +174,13 @@ async function regenerate(messageIndex, db) {
     modelMessage.activeVersion = modelMessage.versions.length - 1;
     await db.chats.put(currentChat);
     
-    // Update the version swiper text
     const swiperElement = messageElement.querySelector('.version-swiper span');
     if (swiperElement) {
         swiperElement.textContent = `${modelMessage.activeVersion + 1}/${modelMessage.versions.length}`;
     } else {
-        // If swiper didn't exist, we need to reload to build it properly.
         await chatsService.loadChat(currentChat.id, db);
     }
 }
-
-
-// --- The rest of the file remains largely the same ---
 
 export async function insertMessage(msgObj, index, db, personality = null) {
     const newMessage = document.createElement("div");
@@ -200,7 +228,7 @@ export async function insertMessage(msgObj, index, db, personality = null) {
             newMessage.querySelector(".btn-version-next").addEventListener("click", () => switchVersion(index, 1, db));
         }
 
-    } else { // User message
+    } else {
         newMessage.classList.add("message-user");
         newMessage.innerHTML = `
             <div class="message-header"><h3 class="message-role">You</h3><div class="message-actions">
@@ -224,7 +252,6 @@ export async function insertMessage(msgObj, index, db, personality = null) {
     return newMessage;
 }
 
-// These functions will now just reload the chat to ensure stability
 async function regenerateUserMessage(userMessageIndex, db) {
     await chatsService.loadChat(chatsService.getCurrentChatId(), db);
 }
