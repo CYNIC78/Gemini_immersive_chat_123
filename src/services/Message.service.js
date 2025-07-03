@@ -5,7 +5,6 @@ import * as personalityService from "./Personality.service.js";
 import * as chatsService from "./Chats.service.js";
 import * as helpers from "../utils/helpers.js";
 
-// Helper to build the content history for the stateless API call
 function buildContentHistory(chat, stoppingIndex = null) {
     const contentToProcess = stoppingIndex ? chat.content.slice(0, stoppingIndex) : chat.content;
     const history = [];
@@ -21,7 +20,6 @@ function buildContentHistory(chat, stoppingIndex = null) {
     return history;
 }
 
-// --- SEND FUNCTION: REBUILT FROM THE GROUND UP USING THE STATELESS METHOD ---
 export async function send(msg, db) {
     const settings = settingsService.getSettings();
     const selectedPersonality = await personalityService.getSelected();
@@ -41,17 +39,14 @@ export async function send(msg, db) {
         currentChat = await chatsService.getCurrentChat(db);
     }
 
-    // 1. Prepare history and add the new user message for the API call
     const history = buildContentHistory(currentChat);
     const contents = [...history, { role: 'user', parts: [{ text: msg }] }];
 
-    // 2. Add the user message to the UI and our local chat object
     const userMessage = { role: "user", parts: [{ text: msg }] };
     currentChat.content.push(userMessage);
     await insertMessage(userMessage, currentChat.content.length - 1, db);
     helpers.messageContainerScrollToBottom();
     
-    // 3. Prepare all instructions and settings
     const mainSystemPrompt = settingsService.getSystemPrompt();
     const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
     const fullSystemInstruction = mainSystemPrompt + "\n\n" + characterPrompt;
@@ -68,12 +63,13 @@ export async function send(msg, db) {
         safetySettings: settings.safetySettings
     });
 
-    // 4. Make the stateless API call that worked in our diagnostic
+    // --- THIS IS THE FIX ---
+    // Make the stateless API call
     const result = await model.generateContentStream({ contents });
-
-    // 5. Stream the response and save it
+    
+    // Stream the response and save it, using the correct variable name `result.stream`
     const placeholder = await insertMessage({ role: 'model' }, currentChat.content.length, db, selectedPersonality);
-    const reply = await streamResponse(placeholder, stream);
+    const reply = await streamResponse(placeholder, result.stream); 
 
     const modelMessage = {
         role: "model",
@@ -88,7 +84,6 @@ export async function send(msg, db) {
     await chatsService.loadChat(currentChat.id, db);
 }
 
-// --- REGENERATE FUNCTION: ALSO REBUILT USING THE STATELESS METHOD ---
 async function regenerate(messageIndex, db) {
     const settings = settingsService.getSettings();
     const selectedPersonality = await personalityService.getSelected();
@@ -121,8 +116,6 @@ async function regenerate(messageIndex, db) {
     await db.chats.put(currentChat);
     await chatsService.loadChat(currentChat.id, db);
 }
-
-// (The functions below this line are for UI and are mostly unchanged)
 
 async function streamResponse(messageElement, netStream) {
     const messageContent = messageElement.querySelector(".message-text");
