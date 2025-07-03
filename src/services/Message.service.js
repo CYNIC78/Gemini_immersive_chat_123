@@ -32,7 +32,7 @@ export async function send(msg, db) {
     let currentChat = await chatsService.getCurrentChat(db);
     if (!currentChat) {
         const titleModel = ai.getGenerativeModel({ model: settings.model });
-        const titleResult = await titleModel.generateContent(`Title a chat that starts with: "${msg}" (4 words max)`);
+        const titleResult = await titleModel.generateContent(`You are a title generator. Your ONLY job is to create a short, concise title (6 words max) for a chat that starts with the following message. Do NOT add any extra text, conversation, greetings, or quotation marks. ONLY reply with the title itself. Message: "${msg}"`);
         const title = titleResult.response.text();
         const id = await chatsService.addChat(title, null, db);
         document.querySelector(`#chat${id}`).click();
