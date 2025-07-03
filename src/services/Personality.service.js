@@ -51,7 +51,9 @@ export async function initialize() {
 }
 
 export async function getSelected() {
-    const selectedRadio = document.querySelector("input[name='personality']:checked');
+    // --- THIS IS THE FIX ---
+    // The string now correctly ends with a double quote.
+    const selectedRadio = document.querySelector("input[name='personality']:checked");
     if (!selectedRadio) return getDefault(); // Failsafe
 
     const parentLabel = selectedRadio.parentElement;
@@ -82,7 +84,6 @@ export async function get(id) {
 export async function getByName(name, database = null) {
     if (!name) return null;
     
-    // --- THIS IS THE FIX ---
     // Handle default personality by its actual name
     if (name.toLowerCase() === "aphrodite") {
         return { ...getDefault(), id: -1 };
@@ -202,7 +203,6 @@ export async function edit(id, personality) {
 export function generateCard(personality) {
     const card = document.createElement("label");
     card.classList.add("card-personality");
-    // FIX: Also give the default Aphrodite card an ID so it can be found.
     card.id = `personality-${personality.id || -1}`;
 
     card.innerHTML = `
