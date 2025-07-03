@@ -1,414 +1,272 @@
-<!DOCTYPE html>
-<html lang="en">
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { marked } from "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js";
+import * as settingsService from "./Settings.service.js";
+import * as personalityService from "./Personality.service.js";
+import * as chatsService from "./Chats.service.js";
+import * as helpers from "../utils/helpers.js";
+import * as characterScriptService from "./CharacterScript.service.js";
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aphrodisiac, by CYNIC</title>
-    <link rel="shortcut icon" href="https://upload.wikimedia.org/wikipedia/commons/f/f0/Google_Bard_logo.svg"
-        type="image/x-icon">
-    <link rel="stylesheet" href="./styles/main.css">
-    <link rel="stylesheet"
-        href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.css">
-    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-VCHJXFGB08"></script>
-    <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag() { dataLayer.push(arguments); }
-        gtag('js', new Date());
+// --- Core Helper Functions ---
 
-        gtag('config', 'G-VCHJXFGB08');
-    </script>
+/**
+ * Creates a "typewriter" effect by rendering words one by one.
+ * @param {ReadableStream} stream - The stream from the Gemini API.
+ * @param {HTMLElement} textElement - The HTML element to type into.
+ * @returns {Promise<string>} - A promise that resolves with the full raw text.
+ */
+function typewriterStream(stream, textElement) {
+    const settings = settingsService.getSettings();
+    const streamDelay = 150 - Number(settings.typingSpeed); // Invert the value so left is slow, right is fast
 
-</head>
+    return new Promise(async (resolve) => {
+        let wordBuffer = [];
+        let fullText = "";
+        let isStreaming = true;
 
+        const writer = setInterval(() => {
+            if (wordBuffer.length > 0) {
+                fullText += wordBuffer.shift() + " ";
+                textElement.innerHTML = marked.parse(fullText, { breaks: true });
+                helpers.messageContainerScrollToBottom();
+            } else if (!isStreaming) {
+                clearInterval(writer);
+                hljs.highlightAll();
+                resolve(fullText);
+            }
+        }, streamDelay); // Use the value from settings
 
-<body>
-    <div class="container">
-        <div class="sidebar">
-            <div class="header">
-                <button class="material-symbols-outlined btn-textual" id="btn-hide-sidebar">
-                    arrow_back_ios_new
-                </button>
-                <img src="https://upload.wikimedia.org/wikipedia/commons/f/f0/Google_Bard_logo.svg" id="gemin-pro-logo">
-                <div id="title-div">
-                    <div id="zodiac-branding">Aphrodisiac</div>
-                    <div id="gemini-pro-branding">powered by Gemini 2.5</div>
-                </div>
-                <button class="badge" id="btn-whatsnew">
-                    <span id="badge-version"></span>
-                </button>
-            </div>
-            <div class="navbar">
-                <div class="navbar-tab">Chats</div>
-                <div class="navbar-tab">Characters</div>
-                <div class="navbar-tab">Settings</div>
-                <div id="navbar-tab-highlight"></div>
-            </div>
-            <div id="sidebar-content">
-                <div class="sidebar-section">
-                    <div class="btn-array">
-                        <button id="btn-new-chat">
-                            <span class="material-symbols-outlined">add</span> <span>New Chat</span>
-                        </button>
-                        <button id="btn-reset-chat">
-                            <span class="material-symbols-outlined">clear_all</span>Clear All
-                        </button>
-                    </div>
-
-                    <input type="radio" name="currentChat" value="none" checked>
-                    <div id="chatHistorySection">
-
-                    </div>
-                </div>
-
-                <div class="sidebar-section" id="personalitySection">
-                    <div class="btn-array">
-                        <button id="btn-import-personality">
-                            <span class="material-symbols-outlined">upload</span>Import
-                        </button>
-                        <button id="btn-clearall-personality">
-                            <span class="material-symbols-outlined">clear_all</span>Clear All
-                        </button>
-                    </div>
-                    <div id="personalitiesDiv"></div>
-                </div>
-
-                <div class="sidebar-section">
-					<!-- START: API Key Management Section -->
-					<h3>API Key Management</h3>
-					<div class="api-key-manager">
-						<div class="setting-row">
-							<label for="apiKeySelector" class="setting-label"><span class="material-symbols-outlined">key</span>Active Key</label>
-							<div class="input-with-button" style="display: flex; align-items: center; gap: 4px;">
-								<select id="apiKeySelector" class="input-field" style="flex-grow: 1;"></select>
-								<button id="btn-delete-key" class="material-symbols-outlined btn-textual" title="Delete selected key">delete</button>
-							</div>
-						</div>
-						<div class="setting-row" style="margin-top: 1rem;">
-							<label for="newApiKeyInput" class="setting-label"><span class="material-symbols-outlined">add</span>Add New Key</label>
-							<div class="input-with-button" style="display: flex; align-items: center; gap: 4px;">
-								<input type="password" autocomplete="off" placeholder="Paste new API key here" id="newApiKeyInput" class="input-field" style="flex-grow: 1;">
-								<button id="btn-add-key" class="material-symbols-outlined btn-textual" title="Add new key">add_circle</button>
-								<button class="material-symbols-outlined btn-textual" title="Get an API key" onclick="window.open('https://aistudio.google.com/app/apikey', '_blank')">help</button>
-							</div>
-						</div>
-					</div>
-					<div class="api-key-error">
-						<span class="material-symbols-outlined">error</span> Invalid API Key
-					</div>
-					<!-- END: API Key Management Section -->
-					
-                    <h3>Generation Settings</h3>
-                    <div class="generation-settings">
-                        <div>
-                            <label class="setting-label" for="selectedModel"><span class="material-symbols-outlined">neurology</span>Model
-                                <span class="material-symbols-outlined tooltip" 
-                                style="font-size: 0.885rem; opacity: 0.6; cursor:default"
-                                info="Pro model has a very low daily limit. It is recommmended to stick to Flash or Flash Lite, only falling back to pro for high priority requests.">
-                                    info
-                                </span> </label>
-                            <select id="selectedModel" class="input-field">
-                                <option value="gemini-2.0-flash-lite">Flash Lite</option>
-                                <option value="gemini-2.5-flash-preview-04-17" selected="true">Flash</option>
-                                <option value="gemini-2.5-pro-preview-05-06">Pro</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="setting-label" for="maxTokens"><span class="material-symbols-outlined">generating_tokens</span><span>
-                                Max Output
-                                    Tokens
-                            </span>
-                            <span class="material-symbols-outlined tooltip" 
-                            style="font-size: 0.885rem; opacity: 0.6; cursor:default"
-                            info="Dictates the maximum length of the model's response. If responses get cut off, increase this value.">
-                                info
-                            </span> 
-                        </label>
-                            <input type="number" id="maxTokens" class="input-field" min="1" max="1000000" value="1000"></input>
-                        </div>
-                        <div>
-                            <label class="setting-label" for="safetySettings"><span class="material-symbols-outlined">
-                                    health_and_safety
-                                </span>
-                                <span>Safety</span>
-                                <span class="material-symbols-outlined tooltip" 
-                                style="font-size: 0.885rem; opacity: 0.6; cursor:default"
-                                info="Controls the model's sensitivity to potentially harmful content.">
-                                    info
-                                </span> </label>
-                            <select id="safetySettings" class="input-field">
-                                <option value="safe">Safe</option>
-                                <option value="moderate">Moderate</option>
-                                <option value="risky" selected="true">Risky</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="setting-label" for="temperature">
-                                <span class="material-symbols-outlined">thermostat</span>
-                                <span>Temperature</span> 
-                                <span class="material-symbols-outlined tooltip" 
-                                style="font-size: 0.885rem; opacity: 0.6; cursor:default"
-                                info="Lower values are more deterministic, higher values are more creative. The recommended range is between 0.5 and 1.25.">
-                                    info
-                                </span> 
-                            </label>
-                            <div class="btn-array">
-                                <input type="range" min="20" max="200" id="temperature" class="slider">
-                                <label id="label-temperature">0</label>
-                            </div>
-                        </div>
-                    </div>
-                    <h3>User Experience</h3>
-                    <div class="setting-group">
-                         <div class="setting-row-small">
-                            <input id="autoscroll" type="checkbox" name="autoscrollEnabled"></input>
-                            <label for="autoscroll">Autoscroll</label>
-                        </div>
-                        <div class="setting-row-small" style="margin-top: 1rem;">
-                            <label class="setting-label" for="typingSpeed">
-                                <span>Typing Speed</span>
-                                <span class="material-symbols-outlined tooltip" 
-                                style="font-size: 0.885rem; opacity: 0.6; cursor:default"
-                                info="Controls the delay between words for the typing effect. Slower is on the left, faster is on the right.">
-                                    info
-                                </span> 
-                            </label>
-                            <div class="btn-array">
-                                <input type="range" min="150" max="0" id="typingSpeed" class="slider">
-                                <label id="label-typingSpeed">50ms</label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- START: New Color Scheme Section -->
-                    <h3>Color Scheme</h3>
-                    <div class="color-settings">
-                        <div class="setting-row">
-                            <label for="colorPrimaryBg">Primary Background</label>
-                            <input type="color" id="colorPrimaryBg">
-                        </div>
-                        <div class="setting-row">
-                            <label for="colorSecondaryBg">Secondary Background</label>
-                            <input type="color" id="colorSecondaryBg">
-                        </div>
-                        <div class="setting-row">
-                            <label for="colorTertiaryBg">Input/Box Background</label>
-                            <input type="color" id="colorTertiaryBg">
-                        </div>
-                        <div class="setting-row">
-                            <label for="colorPrimaryText">Primary Text</label>
-                            <input type="color" id="colorPrimaryText">
-                        </div>
-                        <div class="setting-row">
-                            <label for="colorAccent">Accent / Buttons</label>
-                            <input type="color" id="colorAccent">
-                        </div>
-                        <div class="setting-row">
-                            <label for="colorButtonText">Button Text</label>
-                            <input type="color" id="colorButtonText">
-                        </div>
-                        <button id="btn-reset-colors" style="margin-top: 1rem;">Reset to Theme Defaults</button>
-                    </div>
-                    <!-- END: New Color Scheme Section -->
-
-                    <h3>Donate</h3>
-                    <div class="btn-array">
-                        <a href="https://patreon.com/faetalize" target="_blank" rel="noopener noreferrer"
-                            class="card card-patreon">
-                            <span class="patreon-logo">PATREON</span>
-                        </a>
-                        <a href="https://liberapay.com/faetalize" target="_blank" rel="noopener noreferrer"
-                            class="card card-liberapay">
-                            <span class="liberapay-logo">liberapay</span>
-                        </a>
-                        <a href="https://www.paypal.com/paypalme/alskdjaoiwdawwfq" target="_blank"
-                            rel="noopener noreferrer" class="card card-paypal">
-                            <span class="paypal-logo1">Pay</span><span class="paypal-logo2">Pal</span>
-                        </a>
-                    </div>
-
-                </div>
-            </div>
-
-
-            <div class="credits">
-                Made by fætalize
-                <a href="https://github.com/faetalize/zodiac">Source Code</a>
-            </div>
-        </div>
-        
-        <div id="sidebar-resizer"></div>
-
-        <div id="mainContent">
-            <div class="header">
-                <button class="material-symbols-outlined btn-textual" id="btn-show-sidebar">
-                    arrow_forward_ios <!-- default = menu -->
-                </button>
-            </div>
-            <div class="message-container"></div>
-            <div id="message-box">
-                <span contenteditable placeholder="Send a message" id="messageInput" class="input-field"></span>
-                <button type="submit" class="btn-textual material-symbols-outlined" id="btn-send">send</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="overlay">
-        <div class="header">
-            <button class="btn-textual" id="btn-hide-overlay">BACK</button>
-        </div>
-        <div class="overlay-content">
-            <form id="form-add-personality">
-                <div class="stepper first-step" id="stepper-add-personality">
-                    <div class="stepper-content">
-                        <div class="step active">
-                            <h3>Basic Info & Scene</h3>
-                            <input style="display: none;" name="id">
-                            <label for="name">Name:</label>
-                            <input type="text" name="name" placeholder="Mario" list="name-list">
-                            
-                            <label for="defaultAvatarTag">Default Avatar Tag:</label>
-                            <input type="text" name="defaultAvatarTag" placeholder="e.g., default, neutral" value="default">
-
-                            <label for="description">Description:</label>
-                            <input type="text" name="description" placeholder="A  plumber with a shroom addiction.">
-                            
-                            <label for="prompt">System Prompt:</label>
-                            <textarea name="prompt"
-                                placeholder="You are to act as main character from the Mario video game series..."
-                                class="stepper-textarea"></textarea>
-
-                            <label for="scenario">Scenario (Optional):</label>
-                            <textarea name="scenario"
-                                placeholder="Set the scene for the beginning of the chat. Example: The user has just entered your ancient library seeking forbidden knowledge."
-                                class="stepper-textarea"></textarea>
-
-                            <label for="firstMessagePrompt">First Message Prompt (Optional):</label>
-                            <textarea name="firstMessagePrompt"
-                                placeholder="Instruct the AI on how to write the very first message. Example: Greet the user and ask them which tome they are looking for."
-                                class="stepper-textarea"></textarea>
-                            
-                            <label for="customScript">Custom JavaScript (Advanced):
-                                <span class="material-symbols-outlined tooltip" 
-                                style="font-size: 0.885rem; opacity: 0.6; cursor:default"
-                                info="This script runs *after* the AI responds. It can dynamically change the character's image URL or modify the AI's response text before it is displayed.">
-                                    info
-                                </span> 
-                            </label>
-                            <textarea name="customScript"
-                                placeholder="/* Example using the Asset Manager */
-if (modelResponse.toLowerCase().includes('happy')) {
-  const happyImage = getImageByTag('happy');
-  if (happyImage) { character.image = happyImage; }
+        try {
+            for await (const chunk of stream) {
+                const words = chunk.text().split(/\s+/).filter(Boolean);
+                wordBuffer.push(...words);
+            }
+        } catch (error) {
+            console.error("Stream error:", error);
+            textElement.innerHTML += `<br><br><strong style='color:red;'>Error during stream. Check console (F12).</strong>`;
+        } finally {
+            isStreaming = false;
+        }
+    });
 }
-return { character, modelResponse };"
-                                class="stepper-textarea"
-                                style="height: 150px; font-family: 'Courier New', Courier, monospace;"></textarea>
-                        </div>
-                        <div class="step">
-                            <h3>Personality & Directives</h3>
-                            <label for="aggressiveness">Aggressiveness:</label>
-                            <input type="range" name="aggressiveness" min="0" max="3" step="1"
-                                list="aggressiveness-steps">
-                            <datalist id="aggressiveness-steps">
-                                <option value="0">0</option>
-                                <option value="1">1</option>
-                                <option value="2">2</option>
-                                <option value="3">3</option>
-                            </datalist>
-                            <label for="sensuality">Sensuality:</label>
-                            <input type="range" name="sensuality" min="0" max="3" step="1" list="sensuality-steps">
-                            <datalist id="sensuality-steps">
-                                <option value="0">0</option>
-                                <option value="1">1</option>
-                                <option value="2">2</option>
-                                <option value="3">3</option>
-                            </datalist>
-                            <h3>Tweaks</h3>
-                            <div style="display: flex; gap: 0.25rem; align-items: center;">
-                                <input id="internet-access" type="checkbox" name="internetEnabled"></input>
-                                <label for="internet-access">Internet Access</label>
-                                <span class="material-symbols-outlined tooltip"
-                                    style="font-size: 0.885rem; opacity: 0.6; cursor:default"
-                                    info="Enhance the model's responses with online search queries. Useful for fact checking and grounding. Currently still in development.">info</span>
-                            </div>
-                            <div style="display: flex; gap: 0.25rem; align-items: center;">
-                                <input id="roleplay" type="checkbox" name="roleplayEnabled"></input>
-                                <label for="roleplay">Roleplay</label>
-                                <span class="material-symbols-outlined tooltip"
-                                    style="font-size: 0.885rem; opacity: 0.6; cursor:default"
-                                    info="This attribute enhances your roleplay experience by enabling a new game-ified interface. Currently still in development.">info</span>
-                            </div>
 
-                            <h3 style="margin-top: 1.5rem;">Directives</h3>
-                            <label for="reminder">Reminder / Hidden Instruction (Optional):</label>
-                            <textarea name="reminder"
-                                placeholder="This text is sent with every message to constantly guide the AI. It is NOT saved in the chat history. Example: Always speak in rhymes."
-                                class="stepper-textarea"></textarea>
-                        </div>
-                        <div class="step">
-                            <div>
-                                <h3 style="display:inline">Tone Examples</h3>
-                                <span style="opacity: 60%; font-size: 90%; font-style: italic;">Optional</span>
-                            </div>
-                            <input type="text" name="tone-example-1" class="tone-example"
-                                placeholder="I'm a plumber, not a doctor. Lets-a go!">
-                            <button type="button" id="btn-add-tone-example"
-                                class="material-symbols-outlined">add_circle</button>
-                        </div>
-                        <div class="step">
-                            <h3>Asset Manager</h3>
-                            <div class="asset-manager-container">
-                                <div class="asset-groups-panel">
-                                    <h4>Groups</h4>
-                                    <div class="input-with-button">
-                                        <input type="text" id="new-group-name" placeholder="New group name" class="input-field">
-                                        <button type="button" id="btn-add-group" class="material-symbols-outlined btn-textual" title="Add Group">add_circle</button>
-                                    </div>
-                                    <div id="asset-groups-list">
-                                        <div class="group-item active">All Assets</div>
-                                    </div>
-                                </div>
-                                <div class="asset-gallery-panel">
-                                    <div class="asset-gallery-header">
-                                        <h4 id="current-group-header">All Assets</h4>
-                                        <button type="button" id="btn-upload-asset">
-                                            <span class="material-symbols-outlined">upload_file</span>
-                                            Upload
-                                        </button>
-                                    </div>
-                                    <div id="asset-gallery-grid">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="stepper-footer">
-                        <button id="btn-stepper-previous" type="button">Previous</button>
-                        <div id="stepper-progress"></div>
-                        <button id="btn-stepper-next" type="button">Next</button>
-                        <button id="btn-stepper-submit" type="submit">Submit</button>
-                    </div>
+
+async function streamAndProcessResponse(stream, personality, userMessage, targetElement = null) {
+    let placeholder = targetElement;
+    if (!placeholder) {
+        placeholder = await insertMessage({ role: 'model', versions: [{text:''}] }, -1, null, personality);
+    }
+    const textElement = placeholder.querySelector('.message-text');
+    
+    const rawText = await typewriterStream(stream, textElement);
+
+    let modifiedText = rawText;
+    let finalImage = personalityService.findDefaultAvatar(personality);
+
+    if (personality.customScript && personality.customScript.trim() !== "") {
+        const scriptResult = await characterScriptService.execute(personality.customScript, personality, rawText, userMessage);
+        modifiedText = scriptResult.modelResponse;
+        
+        if (scriptResult.character && scriptResult.character.image) {
+            finalImage = scriptResult.character.image;
+            const characterCard = document.querySelector(`#personality-${personality.id}`);
+            if (characterCard) {
+                const cardImage = characterCard.querySelector('.background-img');
+                if (cardImage) cardImage.src = finalImage;
+            }
+        }
+    }
+
+    placeholder.querySelector('.pfp').src = finalImage;
+    textElement.innerHTML = marked.parse(modifiedText, { breaks: true });
+    hljs.highlightAll();
+
+    return {
+        role: "model",
+        personality: personality.name,
+        personalityid: personality.id,
+        versions: [{ text: modifiedText }],
+        activeVersion: 0,
+    };
+}
+
+
+function buildContentHistory(chat, stoppingIndex = null) {
+    const contentToProcess = stoppingIndex ? chat.content.slice(0, stoppingIndex) : chat.content;
+    const history = [];
+    for (const msg of contentToProcess) {
+        if (msg.role === "model") {
+            const text = msg.versions[msg.activeVersion].text;
+            history.push({ role: "model", parts: [{ text }] });
+        } else {
+            history.push({ role: "user", parts: [{ text: msg.parts[0].text }] });
+        }
+    }
+    return history;
+}
+
+export async function send(msg, db) {
+    const settings = settingsService.getSettings();
+    const selectedPersonality = await personalityService.getSelected();
+    if (!selectedPersonality || !settings.apiKey || !msg) return;
+
+    let currentChat = await chatsService.getCurrentChat(db);
+    if (!currentChat) {
+        const ai = new GoogleGenerativeAI(settings.apiKey);
+        const titleModel = ai.getGenerativeModel({ model: settings.model });
+        const titleResult = await titleModel.generateContent(`Create a short, concise title (6 words max) for a chat that starts with this message. Do NOT add extra text or quotes. Message: "${msg}"`);
+        const id = await chatsService.addChat(titleResult.response.text(), null, db);
+        document.querySelector(`#chat${id}`).click();
+        currentChat = await chatsService.getCurrentChat(db);
+    }
+    
+    const userMessage = { role: "user", parts: [{ text: msg }] };
+    currentChat.content.push(userMessage);
+    await insertMessage(userMessage, currentChat.content.length - 1, db);
+    helpers.messageContainerScrollToBottom();
+
+    let apiMsg = selectedPersonality.reminder ? `${msg}\n\n${selectedPersonality.reminder}` : msg;
+    const history = buildContentHistory(currentChat);
+    const contents = [...history, { role: 'user', parts: [{ text: apiMsg }] }];
+    
+    const ai = new GoogleGenerativeAI(settings.apiKey);
+    const mainSystemPrompt = settingsService.getSystemPrompt();
+    const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
+    const model = ai.getGenerativeModel({ model: settings.model, systemInstruction: mainSystemPrompt + "\n\n" + characterPrompt });
+    const result = await model.generateContentStream({ contents });
+
+    const modelMessage = await streamAndProcessResponse(result.stream, selectedPersonality, msg);
+    
+    currentChat.content.push(modelMessage);
+    await db.chats.put(currentChat);
+    await chatsService.loadChat(currentChat.id, db);
+}
+
+async function regenerate(messageIndex, db) {
+    const settings = settingsService.getSettings();
+    const selectedPersonality = await personalityService.getSelected();
+    let currentChat = await chatsService.getCurrentChat(db);
+    
+    const messageElement = document.querySelector(`.message[data-index="${messageIndex}"]`);
+    messageElement.querySelector('.message-text').innerHTML = ""; 
+    
+    const userMessageText = messageIndex === 0 
+        ? (selectedPersonality.firstMessagePrompt || "")
+        : currentChat.content[messageIndex - 1].parts[0].text;
+    
+    const history = buildContentHistory(currentChat, messageIndex);
+    const contents = [...history, { role: 'user', parts: [{ text: userMessageText }] }];
+
+    const ai = new GoogleGenerativeAI(settings.apiKey);
+    const mainSystemPrompt = settingsService.getSystemPrompt();
+    const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
+    const model = ai.getGenerativeModel({ model: settings.model, systemInstruction: mainSystemPrompt + "\n\n" + characterPrompt });
+    
+    const result = await model.generateContentStream({ contents });
+    
+    const newVersionData = await streamAndProcessResponse(result.stream, selectedPersonality, userMessageText, messageElement);
+
+    const modelMessage = currentChat.content[messageIndex];
+    modelMessage.versions.push(newVersionData.versions[0]);
+    modelMessage.activeVersion = modelMessage.versions.length - 1;
+    await db.chats.put(currentChat);
+    
+    const swiperElement = messageElement.querySelector('.version-swiper span');
+    if (swiperElement) {
+        swiperElement.textContent = `${modelMessage.activeVersion + 1}/${modelMessage.versions.length}`;
+    } else {
+        await chatsService.loadChat(currentChat.id, db);
+    }
+}
+
+export async function insertMessage(msgObj, index, db, personality = null) {
+    const newMessage = document.createElement("div");
+    newMessage.classList.add("message");
+    newMessage.dataset.index = index;
+    const messageContainer = document.querySelector(".message-container");
+    messageContainer.append(newMessage);
+
+    if (msgObj.role === "model") {
+        newMessage.classList.add("message-model");
+        const pfpSrc = (personality && personality.image) || (personality ? personalityService.findDefaultAvatar(personality) : '');
+        const messageRole = personality ? personality.name : 'Model';
+        
+        const hasVersions = msgObj.versions && msgObj.versions.length > 1;
+        const activeVersion = msgObj.activeVersion !== undefined ? msgObj.activeVersion : 0;
+        const versionText = msgObj.versions ? msgObj.versions[activeVersion].text : "";
+
+        newMessage.innerHTML = `
+            <div class="message-header">
+                <img class="pfp" src="${pfpSrc}" loading="lazy">
+                <h3 class="message-role">${messageRole}</h3>
+                <div class="message-actions">
+                    ${hasVersions ? `<div class="version-swiper"><button class="btn-version-prev btn-textual material-symbols-outlined">chevron_left</button><span>${activeVersion + 1}/${msgObj.versions.length}</span><button class="btn-version-next btn-textual material-symbols-outlined">chevron_right</button></div>` : ''}
+                    <button class="btn-refresh btn-textual material-symbols-outlined" title="Regenerate response">refresh</button>
+                    <button class="btn-delete btn-textual material-symbols-outlined" title="Delete message">delete</button>
                 </div>
-            </form>
-
-            <div id="whats-new">
-                <h1 id="header-version">What's New in </h1>
-                <ul id="changelog">
-                    <li>Warning: Pro model is currently disabled for free users. <br>
-                        This is a limitation set by Google and cannot be bypassed. 
-                        <a href="https://x.com/officiallogank/status/1922357621178200248">More info</a></li>
-                    
-                    <li>Visit my discord if you'd like to connect regarding the project, need support, or have any
-                        questions: <a href="https://discord.gg/ZbdPu4Dm3e">Discord Server</a></li>
-
-                </ul>
             </div>
-        </div>
-    </div>
-    <script type="module" src="main.js"></script>
-</body>
+            <div class="message-text" contenteditable="true">${marked.parse(versionText, { breaks: true })}</div>`;
+        hljs.highlightAll();
 
-</html>
+        newMessage.querySelector(".btn-refresh").addEventListener("click", () => regenerate(index, db));
+        newMessage.querySelector(".btn-delete").addEventListener("click", () => deleteMessage(index, db));
+        
+        const messageContentEl = newMessage.querySelector(".message-text");
+        messageContentEl.addEventListener("blur", async () => {
+            const currentChat = await chatsService.getCurrentChat(db);
+            currentChat.content[index].versions[currentChat.content[index].activeVersion].text = messageContentEl.textContent;
+            await db.chats.put(currentChat);
+            messageContentEl.innerHTML = marked.parse(messageContentEl.textContent, { breaks: true });
+            hljs.highlightAll();
+        });
+        
+        if(hasVersions) {
+            newMessage.querySelector(".btn-version-prev").addEventListener("click", () => switchVersion(index, -1, db));
+            newMessage.querySelector(".btn-version-next").addEventListener("click", () => switchVersion(index, 1, db));
+        }
+
+    } else {
+        newMessage.classList.add("message-user");
+        newMessage.innerHTML = `
+            <div class="message-header"><h3 class="message-role">You</h3><div class="message-actions">
+                <button class="btn-refresh btn-textual material-symbols-outlined" title="Regenerate response">refresh</button>
+                <button class="btn-delete btn-textual material-symbols-outlined" title="Delete message">delete</button>
+            </div></div>
+            <div class="message-text" contenteditable="true">${marked.parse(msgObj.parts[0].text, { breaks: true })}</div>`;
+        
+        const messageContentEl = newMessage.querySelector(".message-text");
+        newMessage.querySelector(".btn-refresh").addEventListener("click", () => regenerateUserMessage(index, db));
+        newMessage.querySelector(".btn-delete").addEventListener("click", () => deleteMessage(index, db));
+        
+        messageContentEl.addEventListener("blur", async () => {
+            const currentChat = await chatsService.getCurrentChat(db);
+            currentChat.content[index].parts[0].text = messageContentEl.textContent;
+            await db.chats.put(currentChat);
+            messageContentEl.innerHTML = marked.parse(messageContentEl.textContent, { breaks: true });
+            hljs.highlightAll();
+        });
+    }
+    return newMessage;
+}
+
+async function regenerateUserMessage(userMessageIndex, db) {
+    await chatsService.loadChat(chatsService.getCurrentChatId(), db);
+}
+
+async function switchVersion(messageIndex, direction, db) {
+    const currentChat = await chatsService.getCurrentChat(db);
+    const message = currentChat.content[messageIndex];
+    let newVersionIndex = message.activeVersion + direction;
+    if (newVersionIndex >= message.versions.length) newVersionIndex = 0;
+    if (newVersionIndex < 0) newVersionIndex = message.versions.length - 1;
+    message.activeVersion = newVersionIndex;
+    await db.chats.put(currentChat);
+    await chatsService.loadChat(currentChat.id, db);
+}
+
+async function deleteMessage(index, db) {
+    if (!confirm("Are you sure you want to delete this message?")) return;
+    const currentChat = await chatsService.getCurrentChat(db);
+    currentChat.content.splice(index, 1);
+    await db.chats.put(currentChat);
+    await chatsService.loadChat(currentChat.id, db);
+}
