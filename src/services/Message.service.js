@@ -96,7 +96,7 @@ export async function send(msg, db) {
     currentChat.content.push({ role: "user", parts: [{ text: msg }] });
     currentChat.content.push({ role: "model", personality: selectedPersonality.name, personalityid: selectedPersonality.id, parts: [{ text: reply.md }] });
     await db.chats.put(currentChat);
-    settingsService.saveSettings();
+    //settingsService.saveSettings();
 }
 
 async function regenerate(responseElement, db) {
