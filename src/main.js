@@ -1,6 +1,6 @@
 import * as overlayService from "./services/Overlay.service"; // <-- CORRECTED PATH HERE!
 import { db } from "./services/Db.service";
-import { Personality } from "../models/Personality";
+import { Personality } from "./models/Personality";
 // We now need to import specific functions from Personality.service.js
 // even though many functions are duplicated in this file's global scope.
 // This is a temporary measure to get the feature working with the current file structure.
