@@ -19,7 +19,8 @@ export function loadSettings() {
     ApiKeyInput.value = localStorage.getItem("API_KEY") || "";
     maxTokensInput.value = localStorage.getItem("maxTokens") || 1000;
     temperatureInput.value = localStorage.getItem("TEMPERATURE") || 70;
-    modelSelect.value = localStorage.getItem("model") || "gemini-2.5-flash";
+    // UPDATED: Default model now matches the HTML default for consistency
+    modelSelect.value = localStorage.getItem("model") || "gemini-2.5-flash-preview-04-17";
     autoscrollToggle.checked = localStorage.getItem("autoscroll") === "true";
 }
 
@@ -42,7 +43,7 @@ export function getSettings() {
             { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
             { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE }
         ],
-        model: modelSelect.value,
+        model: modelSelect.value, // This correctly gets the live value from the dropdown
         autoscroll: autoscrollToggle.checked,
     }
 }

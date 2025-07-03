@@ -21,30 +21,31 @@ export async function send(msg, db) {
         return;
     }
     //model setup
-    const ai = new GoogleGenAI({ apiKey: settings.apiKey });
+    // FIXED: Corrected the class name from GoogleGenAI to GoogleGenerativeAI
+    const ai = new GoogleGenerativeAI(settings.apiKey);
     const config = {
         maxOutputTokens: parseInt(settings.maxTokens),
         temperature: settings.temperature / 100,
-        systemPrompt: settingsService.getSystemPrompt(),
         safetySettings: settings.safetySettings,
-        responseMimeType: "text/plain"
     };
     
     //user msg handling
     //we create a new chat if there is none is currently selected
     if (!await chatsService.getCurrentChat(db)) { 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash',
-            contents: "You are to act as a generator for chat titles. The user will send a query - you must generate a title for the chat based on it. Only reply with the short title, nothing else. The user's message is: " + msg,
+        // Use the generative model for chat title generation
+        const model = ai.getGenerativeModel({ 
+            // FIXED: Use the model from settings instead of a hardcoded one
+            model: settings.model,
+            systemInstruction: "You are to act as a generator for chat titles. The user will send a query - you must generate a title for the chat based on it. Only reply with the short title, nothing else. The user's message is: " + msg,
         });
-        const title = response.text;
+        const response = await model.generateContent(""); // The user message is in the system prompt now
+        const title = response.response.text();
         const id = await chatsService.addChat(title, null, db);
         document.querySelector(`#chat${id}`).click();
     }
     await insertMessage("user", msg, null, null, db);
     helpers.messageContainerScrollToBottom();
     //model reply
-    
     
     // Create chat history
     const history = [
@@ -75,19 +76,22 @@ export async function send(msg, db) {
         })
     );
     
-    // Create chat session
-    const chat = ai.chats.create({
+    // Get the generative model with the selected model from settings
+    const generativeModel = ai.getGenerativeModel({
         model: settings.model,
+        systemInstruction: settingsService.getSystemPrompt(),
+    });
+
+    // Create chat session
+    const chat = generativeModel.startChat({
         history: history,
-        config: config
+        generationConfig: config
     });
     
     // Send message with streaming
-    const stream = await chat.sendMessageStream({
-        message: msg
-    });
+    const result = await chat.sendMessageStream(msg);
     
-    const reply = await insertMessage("model", "", selectedPersonality.name, stream, db, selectedPersonality.image);
+    const reply = await insertMessage("model", "", selectedPersonality.name, result.stream, db, selectedPersonality.image);
     //save chat history and settings
     currentChat.content.push({ role: "user", parts: [{ text: msg }] });
     currentChat.content.push({ role: "model", personality: selectedPersonality.name, personalityid: selectedPersonality.id, parts: [{ text: reply.md }] });
@@ -197,11 +201,6 @@ async function updateMessageInDatabase(messageElement, messageIndex, db) {
     }
 }
 
-
-
-
-// REPLACE your old insertMessage function with this new one.
-// REPLACE your insertMessage function with this final version.
 export async function insertMessage(sender, msg, selectedPersonalityTitle = null, netStream = null, db = null, pfpSrc = null) {
     // Create new message div for the user's message then append to message container's top
     const newMessage = document.createElement("div");
@@ -214,10 +213,10 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
         newMessage.classList.add("message-model");
         const messageRole = selectedPersonalityTitle;
 
-        newMessage.innerHTML = `
+        newMessage.innerHTML = \`
             <div class="message-header">
-                <img class="pfp" src="${pfpSrc}" loading="lazy"></img>
-                <h3 class="message-role">${messageRole}</h3>
+                <img class="pfp" src="\${pfpSrc}" loading="lazy"></img>
+                <h3 class="message-role">\${messageRole}</h3>
                 <div class="message-actions">
                     <button class="btn-edit btn-textual material-symbols-outlined">edit</button>
                     <button class="btn-save btn-textual material-symbols-outlined" style="display: none;">save</button>
@@ -225,9 +224,9 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
                     <button class="btn-delete btn-textual material-symbols-outlined" title="Delete message">delete</button>
                 </div>
             </div>
-            <div class="message-role-api" style="display: none;">${sender}</div>
+            <div class="message-role-api" style="display: none;">\${sender}</div>
             <div class="message-text"></div>
-        `;
+        \`;
 
         const refreshButton = newMessage.querySelector(".btn-refresh");
         refreshButton.addEventListener("click", async () => {
@@ -256,18 +255,17 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
             let rawText = "";
             try {
                 for await (const chunk of netStream) {
-                    if (chunk && chunk.text) {
-                        rawText += chunk.text;
-                        messageContent.innerHTML = marked.parse(rawText, { breaks: true });
-                        helpers.messageContainerScrollToBottom();
-                    }
+                    const chunkText = chunk.text();
+                    rawText += chunkText;
+                    messageContent.innerHTML = marked.parse(rawText, { breaks: true });
+                    helpers.messageContainerScrollToBottom();
                 }
                 hljs.highlightAll();
                 helpers.messageContainerScrollToBottom();
                 setupMessageEditing(newMessage, db); 
                 return { HTML: messageContent.innerHTML, md: rawText };
             } catch (error) {
-                alert("Error processing response: " + error);
+                messageContent.innerHTML += "<br><br><strong style='color:red;'>Error: Response stopped. Please check the browser console (F12) for details.</strong>";
                 console.error("Stream error:", error);
                 return { HTML: messageContent.innerHTML, md: rawText };
             }
@@ -278,22 +276,19 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
         newMessage.classList.add("message-user");
 
         const messageRole = "You:";
-        newMessage.innerHTML = `
+        newMessage.innerHTML = \`
             <div class="message-header">
-                <h3 class="message-role">${messageRole}</h3>
+                <h3 class="message-role">\${messageRole}</h3>
                 <div class="message-actions">
                     <button class="btn-edit btn-textual material-symbols-outlined">edit</button>
                     <button class="btn-save btn-textual material-symbols-outlined" style="display: none;">save</button>
-                    
-                    <!-- *** THIS ICON IS NOW 'refresh' INSTEAD OF 'replay' *** -->
                     <button class="btn-regenerate btn-textual material-symbols-outlined" title="Regenerate response">refresh</button>
-                    
                     <button class="btn-delete btn-textual material-symbols-outlined" title="Delete message">delete</button>
                 </div>
             </div>
-            <div class="message-role-api" style="display: none;">${sender}</div>
-            <div class="message-text">${helpers.getDecoded(msg)}</div>
-        `;
+            <div class="message-role-api" style="display: none;">\${sender}</div>
+            <div class="message-text">\${helpers.getDecoded(msg)}</div>
+        \`;
 
         const regenerateButton = newMessage.querySelector(".btn-regenerate");
         if (regenerateButton) {
@@ -315,15 +310,7 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
     }
 }
 
-
-    
-// Add this new function to services/Message.service.js
-
-// REPLACE your old deleteMessage function with this new one.
-
-// REPLACE your old deleteMessage function with this new one.
 async function deleteMessage(messageElement, db) {
-    // ALWAYS confirm a destructive action!
     if (!confirm("Are you sure you want to delete this message? This cannot be undone.")) {
         return;
     }
@@ -332,27 +319,19 @@ async function deleteMessage(messageElement, db) {
         const messageContainer = document.querySelector(".message-container");
         const currentChat = await chatsService.getCurrentChat(db);
         
-        // Find the index of the message in the DOM to find it in the database.
-        // This index corresponds to its position in the `currentChat.content` array.
         const messageIndex = Array.from(messageContainer.children).indexOf(messageElement);
 
         if (messageIndex === -1) {
             throw new Error("Could not find the message to delete.");
         }
         
-        // Remove exactly ONE message from the chat history array in the database.
         currentChat.content.splice(messageIndex, 1);
         
-        // Save the updated chat back to the database.
         await db.chats.put(currentChat);
         
-        // --- THE ROBUST FIX ---
-        // Instead of manually removing the element from the screen (which can be buggy),
-        // we simply tell the chat service to reload the entire chat.
-        // This guarantees that what you see on screen perfectly matches what's in the database.
         await chatsService.loadChat(currentChat.id, db);
 
-        console.log(`Deleted 1 message and reloaded the chat.`);
+        console.log(\`Deleted 1 message and reloaded the chat.\`);
 
     } catch (error) {
         console.error("Failed to delete the message:", error);
