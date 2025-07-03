@@ -11,7 +11,7 @@ import * as characterScriptService from "./CharacterScript.service.js";
 function createTypingIndicator(personality) {
     const indicator = document.createElement("div");
     indicator.classList.add("message", "message-model", "message-typing");
-    const defaultAvatar = personalityService.findDefaultAvatar(personality); // Use helper
+    const defaultAvatar = personalityService.findDefaultAvatar(personality);
     indicator.innerHTML = `
         <div class="message-header">
             <img class="pfp" src="${defaultAvatar}" loading="lazy">
@@ -84,10 +84,11 @@ export async function generateFirstMessage(db) {
     typingIndicator.remove();
 
     let modifiedText = rawText;
-    let displayPersonality = selectedPersonality;
+    let displayPersonality = { ...selectedPersonality, image: personalityService.findDefaultAvatar(selectedPersonality) };
 
     if (selectedPersonality.customScript && selectedPersonality.customScript.trim() !== "") {
-        const scriptResult = await characterScriptService.execute(selectedPersonality, rawText, firstMessageUserContent);
+        // FIXED: Correct argument order
+        const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, firstMessageUserContent);
         modifiedText = scriptResult.modelResponse;
         const finalImage = scriptResult.character.image || personalityService.findDefaultAvatar(selectedPersonality);
         displayPersonality = { ...selectedPersonality, image: finalImage };
@@ -164,7 +165,8 @@ export async function send(msg, db) {
     let displayPersonality = { ...selectedPersonality, image: personalityService.findDefaultAvatar(selectedPersonality) };
 
     if (selectedPersonality.customScript && selectedPersonality.customScript.trim() !== "") {
-        const scriptResult = await characterScriptService.execute(selectedPersonality, rawText, msg);
+        // FIXED: Correct argument order
+        const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, msg);
         modifiedText = scriptResult.modelResponse;
         const finalImage = scriptResult.character.image || personalityService.findDefaultAvatar(selectedPersonality);
         displayPersonality = { ...selectedPersonality, image: finalImage };
@@ -230,9 +232,9 @@ async function regenerate(messageIndex, db) {
     
     let modifiedText = rawText;
     
-    // NEW: Full script execution on regenerate
     if (selectedPersonality.customScript && selectedPersonality.customScript.trim() !== "") {
-        const scriptResult = await characterScriptService.execute(selectedPersonality, rawText, userMessageText);
+        // FIXED: Correct argument order
+        const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, userMessageText);
         modifiedText = scriptResult.modelResponse;
         
         if (scriptResult.character && scriptResult.character.image) {
@@ -271,9 +273,9 @@ async function regenerateUserMessage(userMessageIndex, db) {
 
     let modifiedText = rawText;
     
-    // NEW: Full script execution on user message regenerate
     if (selectedPersonality.customScript && selectedPersonality.customScript.trim() !== "") {
-        const scriptResult = await characterScriptService.execute(selectedPersonality, rawText, userMessage.parts[0].text);
+        // FIXED: Correct argument order
+        const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, userMessage.parts[0].text);
         modifiedText = scriptResult.modelResponse;
         
         if (scriptResult.character && scriptResult.character.image) {
@@ -315,8 +317,6 @@ export async function insertMessage(msgObj, index, db, personality = null) {
 
     if (msgObj.role === "model") {
         newMessage.classList.add("message-model");
-        // If a full personality object with a dynamic image is passed, use it.
-        // Otherwise, find the default avatar.
         const pfpSrc = (personality && personality.image) || (personality ? personalityService.findDefaultAvatar(personality) : '');
         const messageRole = personality ? personality.name : 'Model';
         
