@@ -12,20 +12,22 @@ export class Personality {
         internetEnabled = false, 
         roleplayEnabled = false, 
         toneExamples = [],
-        customScript = "" // NEW: Added custom script property
+        customScript = "",
+        assets = [] // NEW: An array to hold media assets
         ) {
         this.name = name;
         this.image = image;
         this.description = description;
         this.prompt = prompt;
-        this.scenario = scenario; // New: Sets the scene for the chat's beginning
-        this.firstMessagePrompt = firstMessagePrompt; // New: Instructs the AI on the first message
-        this.reminder = reminder; // New: Hidden instruction sent with every message
+        this.scenario = scenario;
+        this.firstMessagePrompt = firstMessagePrompt;
+        this.reminder = reminder;
         this.aggressiveness = aggressiveness;
         this.sensuality = sensuality;
         this.internetEnabled = internetEnabled;
         this.roleplayEnabled = roleplayEnabled;
         this.toneExamples = toneExamples;
-        this.customScript = customScript; // NEW: Added custom script property
+        this.customScript = customScript;
+        this.assets = assets; // NEW: Assign the assets array
     }
 }

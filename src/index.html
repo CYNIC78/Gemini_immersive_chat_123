@@ -274,7 +274,7 @@
                                 placeholder="Instruct the AI on how to write the very first message. Example: Greet the user and ask them which tome they are looking for."
                                 class="stepper-textarea"></textarea>
                             
-                            <!-- *** NEW JAVASCRIPT SECTION START *** -->
+                            <!-- *** CUSTOM JAVASCRIPT SECTION *** -->
                             <label for="customScript">Custom JavaScript (Advanced):
                                 <span class="material-symbols-outlined tooltip" 
                                 style="font-size: 0.885rem; opacity: 0.6; cursor:default"
@@ -290,7 +290,6 @@ if (modelResponse.toLowerCase().includes('happy')) {
 return { character, modelResponse };"
                                 class="stepper-textarea"
                                 style="height: 150px; font-family: 'Courier New', Courier, monospace;"></textarea>
-                            <!-- *** NEW JAVASCRIPT SECTION END *** -->
                         </div>
                         <div class="step">
                             <h3>Personality & Directives</h3>
@@ -329,13 +328,11 @@ return { character, modelResponse };"
                                     info="This attribute enhances your roleplay experience by enabling a new game-ified interface. Currently still in development.">info</span>
                             </div>
 
-                            <!-- NEW SECTION START -->
                             <h3 style="margin-top: 1.5rem;">Directives</h3>
                             <label for="reminder">Reminder / Hidden Instruction (Optional):</label>
                             <textarea name="reminder"
                                 placeholder="This text is sent with every message to constantly guide the AI. It is NOT saved in the chat history. Example: Always speak in rhymes."
                                 class="stepper-textarea"></textarea>
-                            <!-- NEW SECTION END -->
                         </div>
                         <div class="step">
                             <div>
@@ -346,6 +343,37 @@ return { character, modelResponse };"
                                 placeholder="I'm a plumber, not a doctor. Lets-a go!">
                             <button type="button" id="btn-add-tone-example"
                                 class="material-symbols-outlined">add_circle</button>
+                        </div>
+                        <!-- *** NEW ASSET MANAGER STEP *** -->
+                        <div class="step">
+                            <h3>Asset Manager</h3>
+                            <div class="asset-manager-container">
+                                <!-- Groups Panel -->
+                                <div class="asset-groups-panel">
+                                    <h4>Groups</h4>
+                                    <div class="input-with-button">
+                                        <input type="text" id="new-group-name" placeholder="New group name" class="input-field">
+                                        <button type="button" id="btn-add-group" class="material-symbols-outlined btn-textual" title="Add Group">add_circle</button>
+                                    </div>
+                                    <div id="asset-groups-list">
+                                        <!-- Group items will be dynamically inserted here by JavaScript -->
+                                        <div class="group-item active">All Assets</div> <!-- Example -->
+                                    </div>
+                                </div>
+                                <!-- Assets Gallery Panel -->
+                                <div class="asset-gallery-panel">
+                                    <div class="asset-gallery-header">
+                                        <h4 id="current-group-header">All Assets</h4>
+                                        <button type="button" id="btn-upload-asset">
+                                            <span class="material-symbols-outlined">upload_file</span>
+                                            Upload
+                                        </button>
+                                    </div>
+                                    <div id="asset-gallery-grid">
+                                        <!-- Asset cards will be dynamically inserted here by JavaScript -->
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="stepper-footer">

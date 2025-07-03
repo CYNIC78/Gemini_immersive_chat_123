@@ -431,3 +431,84 @@ body.is-resizing { cursor: col-resize; user-select: none; }
 .color-settings input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
 .color-settings input[type="color"]::-webkit-color-swatch { border: 1px solid var(--color-border); border-radius: 4px; }
 .color-settings input[type="color"]::-moz-color-swatch { border: 1px solid var(--color-border); border-radius: 4px; }
+
+
+
+
+/* === Asset Manager === */
+.asset-manager-container {
+    display: flex;
+    gap: 1rem;
+    height: 450px; /* Give it a fixed height */
+    border: 1px solid var(--color-secondary-bg);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+.asset-groups-panel {
+    flex: 0 0 200px; /* Don't grow, don't shrink, base width 200px */
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    border-right: 1px solid var(--color-secondary-bg);
+    padding-right: 1rem;
+}
+
+#asset-groups-list {
+    overflow-y: auto;
+    flex-grow: 1;
+}
+
+.asset-gallery-panel {
+    flex: 1 1 auto; /* Grow and shrink as needed */
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    overflow: hidden; /* Prevent content from spilling */
+}
+
+.asset-gallery-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0; /* Prevent header from shrinking */
+}
+
+#asset-gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 1rem;
+    overflow-y: auto;
+    flex-grow: 1; /* Make grid take up remaining space */
+    padding: 5px;
+}
+
+.group-item {
+    padding: 0.5rem;
+    cursor: pointer;
+    border-radius: 4px;
+    margin-bottom: 0.25rem;
+    border: 1px solid transparent;
+    user-select: none; /* Prevent text selection */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.group-item:hover {
+    background-color: var(--color-secondary-bg);
+}
+
+.group-item.active {
+    background-color: var(--color-accent);
+    color: var(--color-button-text);
+    border-color: var(--color-accent);
+    font-weight: bold;
+}
+
+#btn-upload-asset {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
