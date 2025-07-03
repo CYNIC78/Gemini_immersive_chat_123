@@ -2,16 +2,17 @@ import * as helpers from "../utils/helpers";
 
 const hideSidebarButton = document.querySelector("#btn-hide-sidebar");
 const showSidebarButton = document.querySelector("#btn-show-sidebar");
+const container = document.querySelector(".container"); // Get the main container
 const tabs = document.querySelectorAll(".navbar-tab");
 const tabHighlight = document.querySelector("#navbar-tab-highlight");
 const sidebarViews = document.querySelectorAll(".sidebar-section");
-const sidebar = document.querySelector(".sidebar");
 
+// NEW LOGIC: Add/remove a class on the container
 hideSidebarButton.addEventListener("click", () => {
-    helpers.hideElement(sidebar);
+    container.classList.add("sidebar-hidden");
 });
 showSidebarButton.addEventListener("click", () => {
-    helpers.showElement(sidebar, false);
+    container.classList.remove("sidebar-hidden");
 });
 
 let activeTabIndex = undefined;

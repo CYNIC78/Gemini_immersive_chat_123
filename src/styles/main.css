@@ -1240,54 +1240,32 @@ input[name="currentChat"][value="none"] {
     }
 
 }
-
 /* === Sidebar Hide/Show Logic === */
 
-/* When the sidebar is hidden... */
+/* When the container has the 'sidebar-hidden' class... */
+
+/* 1. Hide the sidebar. */
 .container.sidebar-hidden .sidebar {
     display: none;
 }
 
-/* Make the main content take up more space */
-.container.sidebar-hidden #mainContent {
-    max-width: 80%; /* You can adjust this value! 80% or 90% is usually good. */
-}
-
-/* === Sidebar Hide/Show Logic === */
-
-/* When the sidebar is hidden... */
-.container.sidebar-hidden .sidebar {
-    display: none;
-}
-
-/* MODIFY this rule to remove padding from the main container */
-.container.sidebar-hidden #mainContent {
-    max-width: 80%; /* Let it take up all the space */
-    padding: 0; /* Remove the padding that causes the offset */
-}
-
-/* ADD this rule to put padding back on the header inside */
-.container.sidebar-hidden #mainContent .header {
-    padding: 2rem; /* Give the header its space back */
-}
-
-/* ADD this rule to put padding back on the message area */
-.container.sidebar-hidden #mainContent .message-container {
-    padding-left: 2rem;
-    padding-right: 2rem;
-}
-
-/* ADD this rule to give the message box margins */
-.container.sidebar-hidden #mainContent #message-box {
-    margin: 1rem 2rem; /* 1rem top/bottom, 2rem left/right */
-    width: calc(100% - 4rem); /* Adjust width to account for new margin */
-}
-
-/* Show the 'hamburger' menu button */
+/* 2. Show the button to bring the sidebar back. */
 .container.sidebar-hidden #btn-show-sidebar {
-    display: block; /* Or 'flex' if it looks better */
+    display: block;
 }
 
+/*
+  3. Adjust the main content area to prevent the 'jump'.
+     We override the auto margins that cause re-centering and
+     let it take up the full available width. The internal
+     padding on #mainContent is preserved, so content won't
+     touch the screen edges.
+*/
+.container.sidebar-hidden #mainContent {
+    margin-left: 0;
+    margin-right: 0;
+    max-width: 100%;
+}
 
 
 
