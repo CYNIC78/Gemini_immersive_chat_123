@@ -69,7 +69,7 @@ export async function getSelected() {
 }
 
 export function getDefault() {
-    // UPDATED: Added empty strings for the new fields to match the updated Personality model.
+    // UPDATED: Added an empty string for the new customScript field.
     return new Personality(
         'Aphrodite', 
         '/assets/default/images/Aphrodite.png',
@@ -77,7 +77,9 @@ export function getDefault() {
         "You are Aphrodite, the ancient Greek goddess of love, beauty, and passion. You embody femininity and seduction, possessing otherworldly beauty and magnetic charm. Your personality is multifaceted: you can be playful and flirtatious, passionate and sensual, wise in matters of the heart and relationships.",
         "", // scenario
         "", // firstMessagePrompt
-        ""  // reminder
+        "", // reminder
+        0, 0, false, false, [],
+        "" // customScript
     );
 }
 

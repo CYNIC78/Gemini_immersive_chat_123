@@ -11,7 +11,8 @@ export class Personality {
         sensuality = 0, 
         internetEnabled = false, 
         roleplayEnabled = false, 
-        toneExamples = []
+        toneExamples = [],
+        customScript = "" // NEW: Added custom script property
         ) {
         this.name = name;
         this.image = image;
@@ -25,5 +26,6 @@ export class Personality {
         this.internetEnabled = internetEnabled;
         this.roleplayEnabled = roleplayEnabled;
         this.toneExamples = toneExamples;
+        this.customScript = customScript; // NEW: Added custom script property
     }
 }

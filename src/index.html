@@ -264,7 +264,6 @@
                                 placeholder="You are to act as main character from the Mario video game series..."
                                 class="stepper-textarea"></textarea>
 
-                            <!-- NEW SECTION START -->
                             <label for="scenario">Scenario (Optional):</label>
                             <textarea name="scenario"
                                 placeholder="Set the scene for the beginning of the chat. Example: The user has just entered your ancient library seeking forbidden knowledge."
@@ -274,7 +273,24 @@
                             <textarea name="firstMessagePrompt"
                                 placeholder="Instruct the AI on how to write the very first message. Example: Greet the user and ask them which tome they are looking for."
                                 class="stepper-textarea"></textarea>
-                            <!-- NEW SECTION END -->
+                            
+                            <!-- *** NEW JAVASCRIPT SECTION START *** -->
+                            <label for="customScript">Custom JavaScript (Advanced):
+                                <span class="material-symbols-outlined tooltip" 
+                                style="font-size: 0.885rem; opacity: 0.6; cursor:default"
+                                info="This script runs *after* the AI responds. It can dynamically change the character's image URL or modify the AI's response text before it is displayed.">
+                                    info
+                                </span> 
+                            </label>
+                            <textarea name="customScript"
+                                placeholder="/* Example: Change avatar based on mood */
+if (modelResponse.toLowerCase().includes('happy')) {
+  character.image = 'https://example.com/happy_aphrodite.png';
+}
+return { character, modelResponse };"
+                                class="stepper-textarea"
+                                style="height: 150px; font-family: 'Courier New', Courier, monospace;"></textarea>
+                            <!-- *** NEW JAVASCRIPT SECTION END *** -->
                         </div>
                         <div class="step">
                             <h3>Personality & Directives</h3>
@@ -290,7 +306,8 @@
                             <label for="sensuality">Sensuality:</label>
                             <input type="range" name="sensuality" min="0" max="3" step="1" list="sensuality-steps">
                             <datalist id="sensuality-steps">
-                                <option value="0">0</option>
+                                <option value="0">0</o
+ption>
                                 <option value="1">1</option>
                                 <option value="2">2</option>
                                 <option value="3">3</option>
