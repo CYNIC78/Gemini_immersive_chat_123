@@ -3,7 +3,8 @@ import { db } from "./Db.service";
 import { Personality } from "../models/Personality";
 
 // A helper function to find the default avatar image from assets
-function findDefaultAvatar(personality) {
+// FIXED: Added the 'export' keyword to make this function visible to other files.
+export function findDefaultAvatar(personality) {
     if (personality.assets && personality.assets.length > 0 && personality.defaultAvatarTag) {
         const tag = personality.defaultAvatarTag.trim();
         const defaultAsset = personality.assets.find(asset => 
