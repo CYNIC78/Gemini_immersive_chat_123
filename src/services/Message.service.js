@@ -4,35 +4,24 @@ import * as settingsService from "./Settings.service.js";
 import * as personalityService from "./Personality.service.js";
 import * as chatsService from "./Chats.service.js";
 import * as helpers from "../utils/helpers.js";
-import * as characterScriptService from "./CharacterScript.service.js"; // NEW: Import our script service
+import * as characterScriptService from "./CharacterScript.service.js";
 
-// --- NEW HELPER FUNCTIONS ---
+// --- Helper Functions ---
 
-/**
- * Creates a temporary "Typing..." indicator to show the AI is working.
- * @param {object} personality - The personality that is "typing".
- * @returns {HTMLElement} - The indicator element.
- */
 function createTypingIndicator(personality) {
     const indicator = document.createElement("div");
     indicator.classList.add("message", "message-model", "message-typing");
+    const defaultAvatar = personalityService.findDefaultAvatar(personality); // Use helper
     indicator.innerHTML = `
         <div class="message-header">
-            <img class="pfp" src="${personality.image}" loading="lazy">
+            <img class="pfp" src="${defaultAvatar}" loading="lazy">
             <h3 class="message-role">${personality.name}</h3>
         </div>
-        <div class="message-text">
-            <i>Typing...</i>
-        </div>
+        <div class="message-text"><i>Typing...</i></div>
     `;
     return indicator;
 }
 
-/**
- * Reads a response stream from the Gemini API and collects it into a single text string.
- * @param {object} netStream - The response stream from model.generateContentStream.
- * @returns {Promise<string>} - The complete text response from the model.
- */
 async function streamResponseToText(netStream) {
     let rawText = "";
     try {
@@ -46,7 +35,7 @@ async function streamResponseToText(netStream) {
     }
 }
 
-// --- END OF NEW HELPER FUNCTIONS ---
+// --- End of Helper Functions ---
 
 
 function buildContentHistory(chat, stoppingIndex = null) {
@@ -98,18 +87,16 @@ export async function generateFirstMessage(db) {
     let displayPersonality = selectedPersonality;
 
     if (selectedPersonality.customScript && selectedPersonality.customScript.trim() !== "") {
-        const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, firstMessageUserContent);
+        const scriptResult = await characterScriptService.execute(selectedPersonality, rawText, firstMessageUserContent);
         modifiedText = scriptResult.modelResponse;
-        displayPersonality = { ...selectedPersonality, ...scriptResult.character };
+        const finalImage = scriptResult.character.image || personalityService.findDefaultAvatar(selectedPersonality);
+        displayPersonality = { ...selectedPersonality, image: finalImage };
 
-        // *** NEW: Update sidebar card image if script changes it ***
         if (scriptResult.character && scriptResult.character.image) {
             const characterCard = document.querySelector(`#personality-${selectedPersonality.id}`);
             if (characterCard) {
                 const cardImage = characterCard.querySelector('.background-img');
-                if (cardImage) {
-                    cardImage.src = scriptResult.character.image;
-                }
+                if (cardImage) cardImage.src = scriptResult.character.image;
             }
         }
     }
@@ -132,9 +119,7 @@ export async function generateFirstMessage(db) {
 export async function send(msg, db) {
     const settings = settingsService.getSettings();
     const selectedPersonality = await personalityService.getSelected();
-    if (!selectedPersonality) { return alert("Please select a character."); }
-    if (!settings.apiKey) { return alert("Please enter an API key."); }
-    if (!msg) { return; }
+    if (!selectedPersonality || !settings.apiKey || !msg) return;
 
     const ai = new GoogleGenerativeAI(settings.apiKey);
     
@@ -176,21 +161,19 @@ export async function send(msg, db) {
     typingIndicator.remove();
 
     let modifiedText = rawText;
-    let displayPersonality = selectedPersonality;
+    let displayPersonality = { ...selectedPersonality, image: personalityService.findDefaultAvatar(selectedPersonality) };
 
     if (selectedPersonality.customScript && selectedPersonality.customScript.trim() !== "") {
-        const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, msg);
+        const scriptResult = await characterScriptService.execute(selectedPersonality, rawText, msg);
         modifiedText = scriptResult.modelResponse;
-        displayPersonality = { ...selectedPersonality, ...scriptResult.character };
-
-        // *** NEW: Update sidebar card image if script changes it ***
+        const finalImage = scriptResult.character.image || personalityService.findDefaultAvatar(selectedPersonality);
+        displayPersonality = { ...selectedPersonality, image: finalImage };
+        
         if (scriptResult.character && scriptResult.character.image) {
             const characterCard = document.querySelector(`#personality-${selectedPersonality.id}`);
             if (characterCard) {
                 const cardImage = characterCard.querySelector('.background-img');
-                if (cardImage) {
-                    cardImage.src = scriptResult.character.image;
-                }
+                if (cardImage) cardImage.src = scriptResult.character.image;
             }
         }
     }
@@ -246,10 +229,19 @@ async function regenerate(messageIndex, db) {
     const rawText = await streamResponseToText(result.stream);
     
     let modifiedText = rawText;
-    // NOTE: For simplicity, regeneration does not support dynamic avatar changes, only text modification.
+    
+    // NEW: Full script execution on regenerate
     if (selectedPersonality.customScript && selectedPersonality.customScript.trim() !== "") {
-        const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, userMessageText);
+        const scriptResult = await characterScriptService.execute(selectedPersonality, rawText, userMessageText);
         modifiedText = scriptResult.modelResponse;
+        
+        if (scriptResult.character && scriptResult.character.image) {
+            const characterCard = document.querySelector(`#personality-${selectedPersonality.id}`);
+            if (characterCard) {
+                const cardImage = characterCard.querySelector('.background-img');
+                if (cardImage) cardImage.src = scriptResult.character.image;
+            }
+        }
     }
 
     const modelMessage = currentChat.content[messageIndex];
@@ -278,10 +270,19 @@ async function regenerateUserMessage(userMessageIndex, db) {
     const rawText = await streamResponseToText(result.stream);
 
     let modifiedText = rawText;
-    // NOTE: For simplicity, regeneration does not support dynamic avatar changes, only text modification.
+    
+    // NEW: Full script execution on user message regenerate
     if (selectedPersonality.customScript && selectedPersonality.customScript.trim() !== "") {
-        const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, userMessage.parts[0].text);
+        const scriptResult = await characterScriptService.execute(selectedPersonality, rawText, userMessage.parts[0].text);
         modifiedText = scriptResult.modelResponse;
+        
+        if (scriptResult.character && scriptResult.character.image) {
+            const characterCard = document.querySelector(`#personality-${selectedPersonality.id}`);
+            if (characterCard) {
+                const cardImage = characterCard.querySelector('.background-img');
+                if (cardImage) cardImage.src = scriptResult.character.image;
+            }
+        }
     }
     
     const existingModelMessageIndex = userMessageIndex + 1;
@@ -305,26 +306,6 @@ async function regenerateUserMessage(userMessageIndex, db) {
     await chatsService.loadChat(currentChat.id, db); 
 }
 
-// THIS FUNCTION IS NO LONGER USED for live streaming, but kept for reference if needed.
-async function streamResponse(messageElement, netStream) {
-    const messageContent = messageElement.querySelector(".message-text");
-    let rawText = "";
-    try {
-        for await (const chunk of netStream) {
-            const chunkText = chunk.text();
-            rawText += chunkText;
-            messageContent.innerHTML = marked.parse(rawText, { breaks: true });
-            helpers.messageContainerScrollToBottom();
-        }
-        hljs.highlightAll();
-        return { HTML: messageContent.innerHTML, md: rawText };
-    } catch (error) {
-        messageContent.innerHTML += `<br><br><strong style='color:red;'>Error during stream. Check console (F12).</strong>`;
-        console.error("Stream error:", error);
-        return { HTML: messageContent.innerHTML, md: rawText };
-    }
-}
-
 export async function insertMessage(msgObj, index, db, personality = null) {
     const newMessage = document.createElement("div");
     newMessage.classList.add("message");
@@ -332,11 +313,11 @@ export async function insertMessage(msgObj, index, db, personality = null) {
     const messageContainer = document.querySelector(".message-container");
     messageContainer.append(newMessage);
 
-    let messageContentEl;
-
     if (msgObj.role === "model") {
         newMessage.classList.add("message-model");
-        const pfpSrc = personality ? personality.image : '';
+        // If a full personality object with a dynamic image is passed, use it.
+        // Otherwise, find the default avatar.
+        const pfpSrc = (personality && personality.image) || (personality ? personalityService.findDefaultAvatar(personality) : '');
         const messageRole = personality ? personality.name : 'Model';
         
         const hasVersions = msgObj.versions && msgObj.versions.length > 1;
@@ -356,11 +337,10 @@ export async function insertMessage(msgObj, index, db, personality = null) {
             <div class="message-text" contenteditable="true">${marked.parse(versionText, { breaks: true })}</div>`;
         hljs.highlightAll();
 
-        messageContentEl = newMessage.querySelector(".message-text");
-
         newMessage.querySelector(".btn-refresh").addEventListener("click", () => regenerate(index, db));
         newMessage.querySelector(".btn-delete").addEventListener("click", () => deleteMessage(index, db));
         
+        const messageContentEl = newMessage.querySelector(".message-text");
         messageContentEl.addEventListener("blur", async () => {
             const currentChat = await chatsService.getCurrentChat(db);
             currentChat.content[index].versions[currentChat.content[index].activeVersion].text = messageContentEl.textContent;
@@ -383,8 +363,7 @@ export async function insertMessage(msgObj, index, db, personality = null) {
             </div></div>
             <div class="message-text" contenteditable="true">${marked.parse(msgObj.parts[0].text, { breaks: true })}</div>`;
         
-        messageContentEl = newMessage.querySelector(".message-text");
-
+        const messageContentEl = newMessage.querySelector(".message-text");
         newMessage.querySelector(".btn-refresh").addEventListener("click", () => regenerateUserMessage(index, db));
         newMessage.querySelector(".btn-delete").addEventListener("click", () => deleteMessage(index, db));
         
