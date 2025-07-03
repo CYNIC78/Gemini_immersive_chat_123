@@ -1,10 +1,13 @@
 import { showElement, hideElement } from '../utils/helpers';
 import * as stepperService from './Stepper.service';
+import * as assetManager from './AssetManager.service.js'; // NEW: Import the Asset Manager
+
 const overlay = document.querySelector(".overlay");
 const overlayItems = overlay.querySelector(".overlay-content").children;
 const personalityForm = document.querySelector("#form-add-personality");
 
 export function showAddPersonalityForm() {
+    assetManager.initialize([]); // NEW: Initialize with empty assets for a new character
     showElement(overlay, false);
     showElement(personalityForm, false);
 }
@@ -34,15 +37,14 @@ export function showEditPersonalityForm(personality) {
             continue;
         }
 
-        // --- UPDATED LOGIC ---
-        // This now correctly handles checkboxes as well as regular text inputs.
         if (input.type === 'checkbox') {
             input.checked = personality[key];
         } else {
             input.value = personality[key];
         }
-        // --- END OF UPDATE ---
     }
+
+    assetManager.initialize(personality.assets); // NEW: Initialize with the character's existing assets
     showElement(overlay, false);
     showElement(personalityForm, false);
 }
