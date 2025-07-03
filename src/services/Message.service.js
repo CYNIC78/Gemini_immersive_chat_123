@@ -6,17 +6,15 @@ import * as chatsService from "./Chats.service.js";
 import * as helpers from "../utils/helpers.js";
 import * as characterScriptService from "./CharacterScript.service.js";
 
+// --- NEW: Control the speed of the typing effect (milliseconds per word) ---
+const STREAM_DELAY_MS = 50; // Default value, will be overridden by settings
+
 // --- Core Helper Functions ---
 
-/**
- * Creates a "typewriter" effect by rendering words one by one.
- * @param {ReadableStream} stream - The stream from the Gemini API.
- * @param {HTMLElement} textElement - The HTML element to type into.
- * @returns {Promise<string>} - A promise that resolves with the full raw text.
- */
 function typewriterStream(stream, textElement) {
     const settings = settingsService.getSettings();
-    const streamDelay = 150 - Number(settings.typingSpeed); // Invert the value so left is slow, right is fast
+    // Invert the slider value so left is slow and right is fast
+    const streamDelay = 150 - Number(settings.typingSpeed); 
 
     return new Promise(async (resolve) => {
         let wordBuffer = [];
@@ -33,7 +31,7 @@ function typewriterStream(stream, textElement) {
                 hljs.highlightAll();
                 resolve(fullText);
             }
-        }, streamDelay); // Use the value from settings
+        }, streamDelay);
 
         try {
             for await (const chunk of stream) {
@@ -178,6 +176,52 @@ async function regenerate(messageIndex, db) {
     }
 }
 
+async function regenerateUserMessage(userMessageIndex, db) {
+    const settings = settingsService.getSettings();
+    const selectedPersonality = await personalityService.getSelected();
+    let currentChat = await chatsService.getCurrentChat(db);
+
+    const userMessage = currentChat.content[userMessageIndex];
+    if (!userMessage) return;
+
+    // Find the AI message that follows the user's message, if it exists
+    const modelMessageElement = document.querySelector(`.message[data-index="${userMessageIndex + 1}"]`);
+    
+    if (modelMessageElement) {
+        modelMessageElement.querySelector('.message-text').innerHTML = ""; // Clear for typing
+    }
+
+    const history = buildContentHistory(currentChat, userMessageIndex + 1);
+    const contents = history;
+
+    const ai = new GoogleGenerativeAI(settings.apiKey);
+    const mainSystemPrompt = settingsService.getSystemPrompt();
+    const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
+    const model = ai.getGenerativeModel({ model: settings.model, systemInstruction: mainSystemPrompt + "\n\n" + characterPrompt });
+
+    const result = await model.generateContentStream({ contents });
+    
+    const newVersionData = await streamAndProcessResponse(result.stream, selectedPersonality, userMessage.parts[0].text, modelMessageElement);
+    
+    const modelMessageIndex = userMessageIndex + 1;
+    let modelMessage = currentChat.content[modelMessageIndex];
+    
+    if (modelMessage && modelMessage.role === 'model') {
+        // Add to existing message's versions
+        modelMessage.versions.push(newVersionData.versions[0]);
+        modelMessage.activeVersion = modelMessage.versions.length - 1;
+    } else {
+        // Insert a new message if one didn't exist
+        currentChat.content.splice(modelMessageIndex, 0, newVersionData);
+    }
+    
+    await db.chats.put(currentChat);
+    await chatsService.loadChat(currentChat.id, db);
+}
+
+
+// --- The rest of the file remains largely the same ---
+
 export async function insertMessage(msgObj, index, db, personality = null) {
     const newMessage = document.createElement("div");
     newMessage.classList.add("message");
@@ -246,10 +290,6 @@ export async function insertMessage(msgObj, index, db, personality = null) {
         });
     }
     return newMessage;
-}
-
-async function regenerateUserMessage(userMessageIndex, db) {
-    await chatsService.loadChat(chatsService.getCurrentChatId(), db);
 }
 
 async function switchVersion(messageIndex, direction, db) {
