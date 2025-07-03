@@ -101,6 +101,17 @@ export async function generateFirstMessage(db) {
         const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, firstMessageUserContent);
         modifiedText = scriptResult.modelResponse;
         displayPersonality = { ...selectedPersonality, ...scriptResult.character };
+
+        // *** NEW: Update sidebar card image if script changes it ***
+        if (scriptResult.character && scriptResult.character.image) {
+            const characterCard = document.querySelector(`#personality-${selectedPersonality.id}`);
+            if (characterCard) {
+                const cardImage = characterCard.querySelector('.background-img');
+                if (cardImage) {
+                    cardImage.src = scriptResult.character.image;
+                }
+            }
+        }
     }
 
     const modelMessage = {
@@ -171,6 +182,17 @@ export async function send(msg, db) {
         const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, msg);
         modifiedText = scriptResult.modelResponse;
         displayPersonality = { ...selectedPersonality, ...scriptResult.character };
+
+        // *** NEW: Update sidebar card image if script changes it ***
+        if (scriptResult.character && scriptResult.character.image) {
+            const characterCard = document.querySelector(`#personality-${selectedPersonality.id}`);
+            if (characterCard) {
+                const cardImage = characterCard.querySelector('.background-img');
+                if (cardImage) {
+                    cardImage.src = scriptResult.character.image;
+                }
+            }
+        }
     }
 
     const modelMessage = {
