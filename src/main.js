@@ -104,7 +104,7 @@ settingsService.initialize();
 
 // Initialize database and migrate
 await chatsService.initialize(db);
-await personalityService.migratePersonalities(db);
+//await personalityService.migratePersonalities(db);
 await personalityService.initialize();
 
 //event listeners
