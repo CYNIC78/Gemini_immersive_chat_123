@@ -251,7 +251,7 @@
                     <div class="stepper-content">
                         <div class="step active">
                             <!-- we match the name property of each input to the corresponding key in our personality model (Personality.service.js) -->
-                            <h3>Basic Info</h3>
+                            <h3>Basic Info & Scene</h3>
                             <input style="display: none;" name="id">
                             <label for="name">Name:</label>
                             <input type="text" name="name" placeholder="Mario" list="name-list">
@@ -260,12 +260,24 @@
                             <label for="image">Image URL:</label>
                             <input type="text" name="image" placeholder="https://example.com/mario.png">
                             <label for="prompt">System Prompt:</label>
-                            <textarea type="text" name="prompt"
+                            <textarea name="prompt"
                                 placeholder="You are to act as main character from the Mario video game series..."
-                                style="height: 25rem; resize:vertical"></textarea>
+                                class="stepper-textarea"></textarea>
+
+                            <!-- NEW SECTION START -->
+                            <label for="scenario">Scenario (Optional):</label>
+                            <textarea name="scenario"
+                                placeholder="Set the scene for the beginning of the chat. Example: The user has just entered your ancient library seeking forbidden knowledge."
+                                class="stepper-textarea"></textarea>
+
+                            <label for="firstMessagePrompt">First Message Prompt (Optional):</label>
+                            <textarea name="firstMessagePrompt"
+                                placeholder="Instruct the AI on how to write the very first message. Example: Greet the user and ask them which tome they are looking for."
+                                class="stepper-textarea"></textarea>
+                            <!-- NEW SECTION END -->
                         </div>
                         <div class="step">
-                            <h3>Personality</h3>
+                            <h3>Personality & Directives</h3>
                             <label for="aggressiveness">Aggressiveness:</label>
                             <input type="range" name="aggressiveness" min="0" max="3" step="1"
                                 list="aggressiveness-steps">
@@ -300,6 +312,14 @@
                                     style="font-size: 0.885rem; opacity: 0.6; cursor:default"
                                     info="This attribute enhances your roleplay experience by enabling a new game-ified interface. Currently still in development.">info</span>
                             </div>
+
+                            <!-- NEW SECTION START -->
+                            <h3 style="margin-top: 1.5rem;">Directives</h3>
+                            <label for="reminder">Reminder / Hidden Instruction (Optional):</label>
+                            <textarea name="reminder"
+                                placeholder="This text is sent with every message to constantly guide the AI. It is NOT saved in the chat history. Example: Always speak in rhymes."
+                                class="stepper-textarea"></textarea>
+                            <!-- NEW SECTION END -->
                         </div>
                         <div class="step">
                             <div>

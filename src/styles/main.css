@@ -138,6 +138,14 @@ form { max-width: 100%; max-height: 100%; }
 .stepper.final-step .stepper-footer #btn-stepper-submit { display: block; }
 .stepper-content { flex-grow: 1; overflow: auto; }
 .stepper-footer { display: flex; justify-content: space-between; gap: 0.5rem; }
+
+/* NEW STYLE for textareas in the stepper */
+.stepper-textarea {
+    height: 8rem; /* A good default height for these fields */
+    min-height: 4rem; /* Prevent resizing too small */
+    resize: vertical; /* Allow user to resize vertically */
+}
+
 .slider { margin: 0; padding: 0; flex-grow: 1; }
 
 .overlay {
