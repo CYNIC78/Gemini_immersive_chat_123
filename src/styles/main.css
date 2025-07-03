@@ -391,10 +391,10 @@ code { background-color: var(--color-code-bg); outline: 1px solid var(--color-co
 .container.sidebar-hidden #mainContent { margin-left: 0; margin-right: 0; max-width: 100%; }
 
 /* === MESSAGE ACTION BUTTONS (HOVER TO REVEAL) === */
-.message .btn-regenerate, .message .btn-refresh, .message .btn-edit, .message .btn-delete {
+.message .btn-regenerate, .message .btn-refresh, .message .btn-edit, .message .btn-delete, .message .version-swiper {
     opacity: 0; pointer-events: none; font-size: 1.1rem; transition: opacity 0.2s ease-in-out;
 }
-.message:hover .btn-regenerate, .message:hover .btn-refresh, .message:hover .btn-edit, .message:hover .btn-delete {
+.message:hover .btn-regenerate, .message:hover .btn-refresh, .message:hover .btn-edit, .message:hover .btn-delete, .message:hover .version-swiper {
     opacity: 0.7; pointer-events: auto;
 }
 .message .btn-regenerate:hover, .message .btn-refresh:hover, .message .btn-edit:hover, .message .btn-delete:hover {
