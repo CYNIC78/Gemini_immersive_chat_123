@@ -5,10 +5,6 @@ import * as personalityService from "./Personality.service.js";
 import * as chatsService from "./Chats.service.js";
 import * as helpers from "../utils/helpers.js";
 
-/**
- * Builds the chat history array for the Google AI API.
- * This version is clean and only contains the actual conversation turns.
- */
 function buildCleanHistory(chat, stoppingIndex = null) {
     const contentToProcess = stoppingIndex ? chat.content.slice(0, stoppingIndex) : chat.content;
     const history = [];
@@ -24,9 +20,6 @@ function buildCleanHistory(chat, stoppingIndex = null) {
     return history;
 }
 
-/**
- * Sends a user message, gets a response from the AI, and saves it to the chat.
- */
 export async function send(msg, db) {
     const settings = settingsService.getSettings();
     const selectedPersonality = await personalityService.getSelected();
@@ -52,12 +45,16 @@ export async function send(msg, db) {
         currentChat = await chatsService.getCurrentChat(db);
     }
 
+    // --- THIS IS THE CORRECTED LOGIC ---
+    // 1. Build the history based on the chat content *before* the new message.
+    const cleanHistory = buildCleanHistory(currentChat);
+
+    // 2. Now, add the user's message to the UI and the chat object for saving later.
     const userMessage = { role: "user", parts: [{ text: msg }] };
     currentChat.content.push(userMessage);
-    await insertMessage(userMessage, currentChat.content.length -1, db);
+    await insertMessage(userMessage, currentChat.content.length - 1, db);
     helpers.messageContainerScrollToBottom();
     
-    // --- THIS IS THE FIX: Combine all instructions into one system prompt ---
     const mainSystemPrompt = settingsService.getSystemPrompt();
     const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
     const fullSystemInstruction = mainSystemPrompt + "\n\n" + characterPrompt;
@@ -67,8 +64,7 @@ export async function send(msg, db) {
         systemInstruction: fullSystemInstruction,
     });
 
-    // --- Generate AI Response using a CLEAN history ---
-    const cleanHistory = buildCleanHistory(currentChat);
+    // 3. Start the chat session with the clean, correct history.
     const chatSession = generativeModel.startChat({
         history: cleanHistory,
         generationConfig: {
@@ -78,6 +74,7 @@ export async function send(msg, db) {
         safetySettings: settings.safetySettings
     });
     
+    // 4. Send the new message.
     const stream = await chatSession.sendMessageStream(msg);
     
     const placeholder = await insertMessage({ role: 'model' }, currentChat.content.length, db, selectedPersonality);
@@ -91,6 +88,7 @@ export async function send(msg, db) {
         activeVersion: 0
     };
 
+    // 5. Add the model's response to the chat object and save everything.
     currentChat.content.push(modelMessage);
     await db.chats.put(currentChat);
     await chatsService.loadChat(currentChat.id, db);
