@@ -6,9 +6,6 @@ import * as chatsService from "./Chats.service.js";
 import * as helpers from "../utils/helpers.js";
 import * as characterScriptService from "./CharacterScript.service.js";
 
-// --- NEW: Control the speed of the typing effect (milliseconds per word) ---
-const STREAM_DELAY_MS = 50; // Try values between 30 and 150
-
 // --- Core Helper Functions ---
 
 /**
@@ -18,6 +15,9 @@ const STREAM_DELAY_MS = 50; // Try values between 30 and 150
  * @returns {Promise<string>} - A promise that resolves with the full raw text.
  */
 function typewriterStream(stream, textElement) {
+    const settings = settingsService.getSettings();
+    const streamDelay = 150 - Number(settings.typingSpeed); // Invert the value so left is slow, right is fast
+
     return new Promise(async (resolve) => {
         let wordBuffer = [];
         let fullText = "";
@@ -29,12 +29,11 @@ function typewriterStream(stream, textElement) {
                 textElement.innerHTML = marked.parse(fullText, { breaks: true });
                 helpers.messageContainerScrollToBottom();
             } else if (!isStreaming) {
-                // Buffer is empty and the stream is done
                 clearInterval(writer);
-                hljs.highlightAll(); // Highlight code at the very end
-                resolve(fullText); // Resolve the promise with the complete text
+                hljs.highlightAll();
+                resolve(fullText);
             }
-        }, STREAM_DELAY_MS);
+        }, streamDelay); // Use the value from settings
 
         try {
             for await (const chunk of stream) {
@@ -45,7 +44,7 @@ function typewriterStream(stream, textElement) {
             console.error("Stream error:", error);
             textElement.innerHTML += `<br><br><strong style='color:red;'>Error during stream. Check console (F12).</strong>`;
         } finally {
-            isStreaming = false; // Signal that the stream has finished
+            isStreaming = false;
         }
     });
 }
@@ -58,10 +57,8 @@ async function streamAndProcessResponse(stream, personality, userMessage, target
     }
     const textElement = placeholder.querySelector('.message-text');
     
-    // Start the typewriter effect and wait for the full text
     const rawText = await typewriterStream(stream, textElement);
 
-    // Now that we have the full text, process it
     let modifiedText = rawText;
     let finalImage = personalityService.findDefaultAvatar(personality);
 
@@ -80,7 +77,6 @@ async function streamAndProcessResponse(stream, personality, userMessage, target
     }
 
     placeholder.querySelector('.pfp').src = finalImage;
-    // Update the text element one last time in case the script modified it
     textElement.innerHTML = marked.parse(modifiedText, { breaks: true });
     hljs.highlightAll();
 
@@ -151,7 +147,7 @@ async function regenerate(messageIndex, db) {
     let currentChat = await chatsService.getCurrentChat(db);
     
     const messageElement = document.querySelector(`.message[data-index="${messageIndex}"]`);
-    messageElement.querySelector('.message-text').innerHTML = ""; // Clear for typing
+    messageElement.querySelector('.message-text').innerHTML = ""; 
     
     const userMessageText = messageIndex === 0 
         ? (selectedPersonality.firstMessagePrompt || "")

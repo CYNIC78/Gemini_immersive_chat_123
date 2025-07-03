@@ -161,10 +161,25 @@
                         </div>
                     </div>
                     <h3>User Experience</h3>
-                    <div>
-                         <div style="display: flex; gap: 0.25rem; align-items: center;">
+                    <div class="setting-group">
+                         <div class="setting-row-small">
                             <input id="autoscroll" type="checkbox" name="autoscrollEnabled"></input>
                             <label for="autoscroll">Autoscroll</label>
+                        </div>
+                        <!-- NEW TYPING SPEED SLIDER -->
+                        <div class="setting-row-small">
+                            <label class="setting-label" for="typingSpeed">
+                                <span>Typing Speed</span>
+                                <span class="material-symbols-outlined tooltip" 
+                                style="font-size: 0.885rem; opacity: 0.6; cursor:default"
+                                info="Controls the delay between words for the typing effect. Slower is on the left, faster is on the right.">
+                                    info
+                                </span> 
+                            </label>
+                            <div class="btn-array">
+                                <input type="range" min="150" max="0" id="typingSpeed" class="slider">
+                                <label id="label-typingSpeed">50ms</label>
+                            </div>
                         </div>
                     </div>
 

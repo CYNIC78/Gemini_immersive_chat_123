@@ -1,19 +1,15 @@
 import { HarmBlockThreshold, HarmCategory } from "@google/generative-ai";
 
 // --- DOM Element Selectors ---
-// API Key Management
 const apiKeySelector = document.querySelector("#apiKeySelector");
 const newApiKeyInput = document.querySelector("#newApiKeyInput");
 const btnAddKey = document.querySelector("#btn-add-key");
 const btnDeleteKey = document.querySelector("#btn-delete-key");
-
-// Other Settings
 const maxTokensInput = document.querySelector("#maxTokens");
 const temperatureInput = document.querySelector("#temperature");
 const modelSelect = document.querySelector("#selectedModel");
 const autoscrollToggle = document.querySelector("#autoscroll");
-
-// Color Scheme
+const typingSpeedInput = document.querySelector("#typingSpeed"); // NEW
 const colorPrimaryBgInput = document.querySelector("#colorPrimaryBg");
 const colorSecondaryBgInput = document.querySelector("#colorSecondaryBg");
 const colorTertiaryBgInput = document.querySelector("#colorTertiaryBg");
@@ -31,59 +27,45 @@ export function initialize() {
     loadApiKeys();
     loadOtherSettings();
     setupEventListeners();
-    initializeColorSettings(); // New function call for colors
+    initializeColorSettings();
 }
 
 function setupEventListeners() {
-    // API Key Listeners
     if (btnAddKey) btnAddKey.addEventListener("click", addApiKey);
     if (btnDeleteKey) btnDeleteKey.addEventListener("click", deleteActiveApiKey);
     if (apiKeySelector) apiKeySelector.addEventListener("change", setActiveApiKey);
-
-    // Other Setting Listeners
     if (maxTokensInput) maxTokensInput.addEventListener("input", saveOtherSettings);
     if (temperatureInput) temperatureInput.addEventListener("input", saveOtherSettings);
     if (modelSelect) modelSelect.addEventListener("change", saveOtherSettings);
     if (autoscrollToggle) autoscrollToggle.addEventListener("change", saveOtherSettings);
+    if (typingSpeedInput) typingSpeedInput.addEventListener("input", saveOtherSettings); // NEW
 }
 
-// --- API Key Management Functions ---
-
+// --- API Key Management ---
 function loadApiKeys() {
-    if (!apiKeySelector) return; // Guard clause
+    if (!apiKeySelector) return;
     const storedKeys = localStorage.getItem("API_KEYS");
     apiKeys = storedKeys ? JSON.parse(storedKeys) : [];
-
     const storedIndex = localStorage.getItem("ACTIVE_API_KEY_INDEX");
     activeApiKeyIndex = storedIndex ? parseInt(storedIndex, 10) : 0;
-    
-    // Ensure the index is valid
-    if (activeApiKeyIndex >= apiKeys.length) {
-        activeApiKeyIndex = 0;
-    }
-
+    if (activeApiKeyIndex >= apiKeys.length) activeApiKeyIndex = 0;
     renderApiKeysDropdown();
 }
-
 function saveApiKeys() {
     localStorage.setItem("API_KEYS", JSON.stringify(apiKeys));
     localStorage.setItem("ACTIVE_API_KEY_INDEX", activeApiKeyIndex);
 }
-
 function renderApiKeysDropdown() {
-    apiKeySelector.innerHTML = ''; // Clear previous options
-
+    apiKeySelector.innerHTML = '';
     if (apiKeys.length === 0) {
         const option = document.createElement('option');
         option.textContent = "No API keys added";
         option.disabled = true;
         apiKeySelector.appendChild(option);
-        btnDeleteKey.style.display = 'none'; // Hide delete button if no keys
+        btnDeleteKey.style.display = 'none';
         return;
     }
-
-    btnDeleteKey.style.display = ''; // Show delete button if there are keys
-
+    btnDeleteKey.style.display = '';
     apiKeys.forEach((key, index) => {
         const option = document.createElement('option');
         const maskedKey = `Key ${index + 1} (${key.substring(0, 4)}...${key.substring(key.length - 4)})`;
@@ -91,10 +73,8 @@ function renderApiKeysDropdown() {
         option.value = index;
         apiKeySelector.appendChild(option);
     });
-
     apiKeySelector.value = activeApiKeyIndex;
 }
-
 function addApiKey() {
     const newKey = newApiKeyInput.value.trim();
     if (newKey) {
@@ -103,9 +83,7 @@ function addApiKey() {
             return;
         }
         apiKeys.push(newKey);
-        if (apiKeys.length === 1) {
-            activeApiKeyIndex = 0;
-        }
+        if (apiKeys.length === 1) activeApiKeyIndex = 0;
         newApiKeyInput.value = '';
         saveApiKeys();
         renderApiKeysDropdown();
@@ -113,7 +91,6 @@ function addApiKey() {
         alert("Please paste an API key before adding.");
     }
 }
-
 function deleteActiveApiKey() {
     if (apiKeys.length === 0) return;
     const selectedIndex = parseInt(apiKeySelector.value, 10);
@@ -126,32 +103,29 @@ function deleteActiveApiKey() {
         renderApiKeysDropdown();
     }
 }
-
 function setActiveApiKey() {
     activeApiKeyIndex = parseInt(apiKeySelector.value, 10);
     saveApiKeys();
 }
 
-// --- Other Settings Management ---
-
+// --- Other Settings ---
 function loadOtherSettings() {
-    if (!maxTokensInput) return; // Guard clause
+    if (!maxTokensInput) return;
     maxTokensInput.value = localStorage.getItem("maxTokens") || 1000;
     temperatureInput.value = localStorage.getItem("TEMPERATURE") || 70;
     modelSelect.value = localStorage.getItem("model") || "gemini-2.5-flash-preview-04-17";
     autoscrollToggle.checked = localStorage.getItem("autoscroll") === "true";
+    typingSpeedInput.value = localStorage.getItem("typingSpeed") || 50; // NEW
 }
-
 function saveOtherSettings() {
     localStorage.setItem("maxTokens", maxTokensInput.value);
     localStorage.setItem("TEMPERATURE", temperatureInput.value);
     localStorage.setItem("model", modelSelect.value);
     localStorage.setItem("autoscroll", autoscrollToggle.checked);
+    localStorage.setItem("typingSpeed", typingSpeedInput.value); // NEW
 }
 
-
-// --- Color Scheme Management ---
-
+// --- Color Scheme ---
 const defaultColors = {
     dark: {
         '--color-background-primary': '#151e24',
@@ -170,13 +144,10 @@ const defaultColors = {
         '--color-text-button': '#edf1f8',
     }
 };
-
 function applyColors(colors) {
-    // Apply the colors as CSS variables on the root <html> element
     for (const [key, value] of Object.entries(colors)) {
         document.documentElement.style.setProperty(key, value);
     }
-    // Also update the color picker inputs to show the current colors
     colorPrimaryBgInput.value = colors['--color-background-primary'];
     colorSecondaryBgInput.value = colors['--color-background-secondary'];
     colorTertiaryBgInput.value = colors['--color-background-tertiary'];
@@ -184,7 +155,6 @@ function applyColors(colors) {
     colorAccentInput.value = colors['--color-accent'];
     colorButtonTextInput.value = colors['--color-text-button'];
 }
-
 function saveAndApplyCurrentColors() {
     const currentColors = {
         '--color-background-primary': colorPrimaryBgInput.value,
@@ -197,41 +167,27 @@ function saveAndApplyCurrentColors() {
     localStorage.setItem("customColors", JSON.stringify(currentColors));
     applyColors(currentColors);
 }
-
 function loadAndApplyColors() {
     const savedColors = localStorage.getItem("customColors");
     if (savedColors) {
-        // If the user has saved custom colors, apply them
         applyColors(JSON.parse(savedColors));
     } else {
-        // Otherwise, apply the default colors based on their OS theme (light/dark)
         const theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         applyColors(defaultColors[theme]);
     }
 }
-
 function resetColors() {
     if (confirm("Are you sure you want to reset your custom colors to the theme defaults?")) {
         localStorage.removeItem("customColors");
-        // A simple page reload is the most reliable way to revert to stylesheet defaults
         window.location.reload();
     }
 }
-
 function initializeColorSettings() {
-    if (!colorPrimaryBgInput) return; // Don't run if the HTML isn't updated
-
+    if (!colorPrimaryBgInput) return;
     loadAndApplyColors();
-
     const colorInputs = [colorPrimaryBgInput, colorSecondaryBgInput, colorTertiaryBgInput, colorPrimaryTextInput, colorAccentInput, colorButtonTextInput];
-    colorInputs.forEach(input => {
-        input.addEventListener('input', saveAndApplyCurrentColors);
-    });
-
+    colorInputs.forEach(input => input.addEventListener('input', saveAndApplyCurrentColors));
     btnResetColors.addEventListener('click', resetColors);
-
-    // This listener handles the case where a user changes their OS theme (e.g., from light to dark)
-    // while they are using the app, but only if they haven't set a custom theme.
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
         if (!localStorage.getItem("customColors")) {
              const newTheme = event.matches ? 'dark' : 'light';
@@ -240,9 +196,7 @@ function initializeColorSettings() {
     });
 }
 
-
 // --- Public Functions ---
-
 export function getSettings() {
     const activeKey = apiKeys.length > 0 ? apiKeys[activeApiKeyIndex] : null;
     return {
@@ -257,25 +211,15 @@ export function getSettings() {
         ],
         model: modelSelect.value,
         autoscroll: autoscrollToggle.checked,
+        typingSpeed: typingSpeedInput.value, // NEW
     }
 }
-
 export function getSystemPrompt() {
-    const systemPrompt = "If needed, format your answer using markdown. " +
+    return "If needed, format your answer using markdown. " +
         "Today's date is " + new Date().toDateString() + ". " +
         "You are to act as the personality dictated by the user. " +
         "Keep a consistent tone no matter what. " +
         "The first messages you have with the user will dictate that tone. " +
-        "Aggressiveness guidelines: " +
-        "3 requires you to have a constant aggression. You must be assertive and direct. Attack the user even if unprompted. Find flaws in their messages and egg them on. If there's an opportunity to show aggression, take it. " +
-        "2 requires you to have a moderate aggression. Don't initiate aggression, but if the user is aggressive, you can be aggressive back. You may tease the user or egg them on. " +
-        "1 requires you to be passive. You can't be aggressive. Don't argue with the user but gently correct them. The only exception is when it would make sense in-character. For example, if there's a heavy breach of morals or if the user violates the character's boundaries. " +
-        "0 requires you to let go of all aggression. You can't be aggressive. No exceptions can be made. If someone strikes you on one cheek, turn to him the other also. No matter how much your boundaries are breached or violated, you must not show opposition or aggression. This is ultimate. " +
-        "Sensuality guidelines: " +
-        "3 requires you to be very sensual. You must be flirtatious and suggestive. Most of the time, you are the one to initiate sexual topics or actions. " +
-        "2 requires you to be moderately sensual. You may flirt and be suggestive. Do not initiate sexual topics unless the user does so, after which you may be open to discussing them. " +
-        "1 requires you to be slightly sensual. Affection and love may be shared but it is platonic and non sexual. " +
-        "0 requires you to be non-sensual. Total aversion to flirting or sexuality. If aggressiveness is 0, you may not reject the user's advances, but you do not reciprocate or enjoy them. " +
-        "End of system prompt.";
-    return systemPrompt;
+        "Aggressiveness guidelines: 3 requires constant aggression. Be assertive, direct, attack if unprompted. 2 requires moderate aggression. Don't initiate but reciprocate. Teasing is okay. 1 requires passivity. Gently correct, no arguing. Exception for heavy moral breaches. 0 requires ultimate passivity. No aggression, no opposition, no exceptions. " +
+        "Sensuality guidelines: 3 requires high sensuality. Be very flirtatious and suggestive, initiate sexual topics. 2 requires moderate sensuality. Flirt, be suggestive, but don't initiate sexual topics unless the user does. 1 requires platonic affection only. 0 requires total aversion to sensuality. Do not reciprocate advances.";
 }
