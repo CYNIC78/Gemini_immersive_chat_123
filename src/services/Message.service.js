@@ -6,6 +6,23 @@ import * as chatsService from "./Chats.service.js";
 import * as helpers from "../utils/helpers.js";
 import * as characterScriptService from "./CharacterScript.service.js";
 
+// --- Helper Functions ---
+
+// This function now needs to be available to regenerate as well
+async function streamResponseToText(netStream) {
+    let rawText = "";
+    try {
+        for await (const chunk of netStream) {
+            rawText += chunk.text();
+        }
+        return rawText;
+    } catch (error) {
+        console.error("Stream error:", error);
+        return rawText + `\n<br><br><strong style='color:red;'>Error: Could not get response from model. See console (F12) for details.</strong>`;
+    }
+}
+
+
 // --- NEW Core Streaming Function ---
 /**
  * Creates a message placeholder and streams the AI response into it,
@@ -16,12 +33,10 @@ import * as characterScriptService from "./CharacterScript.service.js";
  * @returns {Promise<object>} - A promise that resolves with the final model message object.
  */
 async function streamAndProcessResponse(netStream, selectedPersonality, userMessageText) {
-    // 1. Create a placeholder message element with the default avatar.
     const placeholder = await insertMessage({ role: 'model', versions: [{text:''}] }, -1, null, selectedPersonality);
     const textElement = placeholder.querySelector('.message-text');
     let rawText = "";
 
-    // 2. Stream the response into the placeholder for the typing effect.
     try {
         for await (const chunk of netStream) {
             rawText += chunk.text();
@@ -34,7 +49,6 @@ async function streamAndProcessResponse(netStream, selectedPersonality, userMess
     }
     hljs.highlightAll();
 
-    // 3. Now that we have the full text, run the custom script.
     let modifiedText = rawText;
     let finalImage = personalityService.findDefaultAvatar(selectedPersonality);
 
@@ -44,8 +58,6 @@ async function streamAndProcessResponse(netStream, selectedPersonality, userMess
         
         if (scriptResult.character && scriptResult.character.image) {
             finalImage = scriptResult.character.image;
-
-            // Update the sidebar card for the latest message
             const characterCard = document.querySelector(`#personality-${selectedPersonality.id}`);
             if (characterCard) {
                 const cardImage = characterCard.querySelector('.background-img');
@@ -54,13 +66,10 @@ async function streamAndProcessResponse(netStream, selectedPersonality, userMess
         }
     }
 
-    // 4. Update the placeholder's avatar and final text.
     placeholder.querySelector('.pfp').src = finalImage;
-    textElement.innerHTML = marked.parse(modifiedText, { breaks: true }); // Ensure final text is correct
+    textElement.innerHTML = marked.parse(modifiedText, { breaks: true });
     hljs.highlightAll();
 
-
-    // 5. Return the final data to be saved.
     return {
         role: "model",
         personality: selectedPersonality.name,
@@ -71,7 +80,7 @@ async function streamAndProcessResponse(netStream, selectedPersonality, userMess
 }
 
 
-// --- Main Functions (Simplified to use the new core function) ---
+// --- Main Functions ---
 
 function buildContentHistory(chat, stoppingIndex = null) {
     const contentToProcess = stoppingIndex ? chat.content.slice(0, stoppingIndex) : chat.content;
@@ -121,11 +130,9 @@ export async function send(msg, db) {
     
     currentChat.content.push(modelMessage);
     await db.chats.put(currentChat);
-    // Reload chat to update indexes and swipers correctly
     await chatsService.loadChat(currentChat.id, db);
 }
 
-// NOTE: Regeneration does not support streaming to keep the logic simple and robust.
 async function regenerate(messageIndex, db) {
     const settings = settingsService.getSettings();
     const selectedPersonality = await personalityService.getSelected();
@@ -153,7 +160,7 @@ async function regenerate(messageIndex, db) {
     const model = ai.getGenerativeModel({ model: settings.model, systemInstruction: mainSystemPrompt + "\n\n" + characterPrompt });
 
     const result = await model.generateContentStream({ contents });
-    const rawText = await streamResponseToText(result.stream);
+    const rawText = await streamResponseToText(result.stream); // Now this function exists!
     
     let modifiedText = rawText;
     let finalImage = personalityService.findDefaultAvatar(selectedPersonality);
@@ -179,11 +186,9 @@ async function regenerate(messageIndex, db) {
     modelMessage.versions.push({ text: modifiedText });
     modelMessage.activeVersion = modelMessage.versions.length - 1;
     await db.chats.put(currentChat);
-    await chatsService.loadChat(currentChat.id, db); // Reload to ensure UI is perfectly in sync
+    await chatsService.loadChat(currentChat.id, db);
 }
 
-
-// --- The rest of the file remains largely the same ---
 
 export async function insertMessage(msgObj, index, db, personality = null) {
     const newMessage = document.createElement("div");
