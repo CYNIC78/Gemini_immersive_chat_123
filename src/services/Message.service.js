@@ -46,7 +46,11 @@ export async function send(msg, db) {
     
     // --- Generate AI Response ---
     const history = buildHistoryForApi(currentChat, selectedPersonality);
-    const generativeModel = ai.getGenerativeModel({
+	
+	console.log("--- Sending this History to API ---");
+	console.log(history);
+    
+	const generativeModel = ai.getGenerativeModel({
         model: settings.model,
         systemInstruction: settingsService.getSystemPrompt(),
     });
