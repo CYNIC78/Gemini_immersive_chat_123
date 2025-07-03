@@ -11,7 +11,10 @@ import * as helpers from "../utils/helpers.js";
 export async function send(msg, db) {
     const settings = settingsService.getSettings();
     const selectedPersonality = await personalityService.getSelected();
-    if (!selectedPersonality) return;
+    if (!selectedPersonality) {
+        alert("Please select a character before starting a chat.");
+        return;
+    }
     if (!settings.apiKey) {
         alert("Please enter an API key in Settings.");
         return;
@@ -35,11 +38,10 @@ export async function send(msg, db) {
         currentChat = await chatsService.getCurrentChat(db); // Re-fetch the newly created chat
     }
 
-    // Add user message to history and display it
+    // Add user message to the screen and to the in-memory chat content
     const userMessage = { role: "user", parts: [{ text: msg }] };
+    await insertMessage(userMessage, currentChat.content.length, db);
     currentChat.content.push(userMessage);
-    await db.chats.put(currentChat);
-    await chatsService.loadChat(currentChat.id, db); // Reload chat to display user message
     helpers.messageContainerScrollToBottom();
     
     // --- Generate AI Response ---
@@ -54,7 +56,7 @@ export async function send(msg, db) {
         generationConfig: generationConfig,
         safetySettings: settings.safetySettings
     });
-
+    
     const stream = await chatSession.sendMessageStream(msg);
     
     // Display the new message placeholder and stream the response
@@ -70,7 +72,7 @@ export async function send(msg, db) {
         activeVersion: 0 // The first version is active by default
     };
 
-    // Save the new model message to the database
+    // Add the new model message to our in-memory chat and then save the whole chat to DB
     currentChat.content.push(modelMessage);
     await db.chats.put(currentChat);
     await chatsService.loadChat(currentChat.id, db); // Reload to show final message with controls
@@ -131,7 +133,7 @@ export async function insertMessage(msgObj, index, db, personality = null) {
         
         // Determine version information
         const hasVersions = msgObj.versions && msgObj.versions.length > 1;
-        const activeVersion = msgObj.activeVersion || 0;
+        const activeVersion = msgObj.activeVersion !== undefined ? msgObj.activeVersion : 0;
         const versionText = msgObj.versions ? msgObj.versions[activeVersion].text : "";
 
         newMessage.innerHTML = `
@@ -176,7 +178,8 @@ export async function insertMessage(msgObj, index, db, personality = null) {
             </div>
             <div class="message-text">${marked.parse(msgObj.parts[0].text, { breaks: true })}</div>
         `;
-        setupMessageEditing(newMessage, index, db);
+        // Note: Editing functionality is not fully wired in this version.
+        // setupMessageEditing(newMessage, index, db); 
         newMessage.querySelector(".btn-delete").addEventListener("click", () => deleteMessage(index, db));
     }
     return newMessage;
@@ -272,9 +275,4 @@ function buildHistoryForApi(chat, personality, stoppingIndex = null) {
         }
     }
     return history;
-}
-
-// Functions for editing messages (simplified for brevity, can be expanded later)
-function setupMessageEditing(messageElement, index, db) {
-    // ... (Editing logic remains the same, but would need to update based on index)
 }
