@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "^0.8.0",
+    "@google/generative-ai": "^0.15.0",
     "dexie": "^4.0.10",
     "dompurify": "^3.2.3",
     "tippy.js": "^6.3.7"
