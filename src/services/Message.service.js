@@ -1,6 +1,6 @@
 //handles sending messages to the api
 
-import { GoogleGenerativeAI } from "@google/generative-ai"
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { marked } from "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js";
 import * as settingsService from "./Settings.service.js";
 import * as personalityService from "./Personality.service.js";
@@ -21,7 +21,6 @@ export async function send(msg, db) {
         return;
     }
     //model setup
-    // FIXED: Corrected the class name from GoogleGenAI to GoogleGenerativeAI
     const ai = new GoogleGenerativeAI(settings.apiKey);
     const config = {
         maxOutputTokens: parseInt(settings.maxTokens),
@@ -34,8 +33,7 @@ export async function send(msg, db) {
     if (!await chatsService.getCurrentChat(db)) { 
         // Use the generative model for chat title generation
         const model = ai.getGenerativeModel({ 
-            // FIXED: Use the model from settings instead of a hardcoded one
-            model: settings.model,
+            model: settings.model, // Use the model from settings
             systemInstruction: "You are to act as a generator for chat titles. The user will send a query - you must generate a title for the chat based on it. Only reply with the short title, nothing else. The user's message is: " + msg,
         });
         const response = await model.generateContent(""); // The user message is in the system prompt now
@@ -213,10 +211,10 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
         newMessage.classList.add("message-model");
         const messageRole = selectedPersonalityTitle;
 
-        newMessage.innerHTML = \`
+        newMessage.innerHTML = `
             <div class="message-header">
-                <img class="pfp" src="\${pfpSrc}" loading="lazy"></img>
-                <h3 class="message-role">\${messageRole}</h3>
+                <img class="pfp" src="${pfpSrc}" loading="lazy"></img>
+                <h3 class="message-role">${messageRole}</h3>
                 <div class="message-actions">
                     <button class="btn-edit btn-textual material-symbols-outlined">edit</button>
                     <button class="btn-save btn-textual material-symbols-outlined" style="display: none;">save</button>
@@ -224,9 +222,9 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
                     <button class="btn-delete btn-textual material-symbols-outlined" title="Delete message">delete</button>
                 </div>
             </div>
-            <div class="message-role-api" style="display: none;">\${sender}</div>
+            <div class="message-role-api" style="display: none;">${sender}</div>
             <div class="message-text"></div>
-        \`;
+        `;
 
         const refreshButton = newMessage.querySelector(".btn-refresh");
         refreshButton.addEventListener("click", async () => {
@@ -276,9 +274,9 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
         newMessage.classList.add("message-user");
 
         const messageRole = "You:";
-        newMessage.innerHTML = \`
+        newMessage.innerHTML = `
             <div class="message-header">
-                <h3 class="message-role">\${messageRole}</h3>
+                <h3 class="message-role">${messageRole}</h3>
                 <div class="message-actions">
                     <button class="btn-edit btn-textual material-symbols-outlined">edit</button>
                     <button class="btn-save btn-textual material-symbols-outlined" style="display: none;">save</button>
@@ -286,9 +284,9 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
                     <button class="btn-delete btn-textual material-symbols-outlined" title="Delete message">delete</button>
                 </div>
             </div>
-            <div class="message-role-api" style="display: none;">\${sender}</div>
-            <div class="message-text">\${helpers.getDecoded(msg)}</div>
-        \`;
+            <div class="message-role-api" style="display: none;">${sender}</div>
+            <div class="message-text">${helpers.getDecoded(msg)}</div>
+        `;
 
         const regenerateButton = newMessage.querySelector(".btn-regenerate");
         if (regenerateButton) {
@@ -331,7 +329,7 @@ async function deleteMessage(messageElement, db) {
         
         await chatsService.loadChat(currentChat.id, db);
 
-        console.log(\`Deleted 1 message and reloaded the chat.\`);
+        console.log(`Deleted 1 message and reloaded the chat.`);
 
     } catch (error) {
         console.error("Failed to delete the message:", error);
