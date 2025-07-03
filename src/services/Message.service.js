@@ -1,51 +1,52 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+//handles sending messages to the api
+
+import { GoogleGenAI } from "@google/generative-ai"
 import { marked } from "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js";
 import * as settingsService from "./Settings.service.js";
 import * as personalityService from "./Personality.service.js";
 import * as chatsService from "./Chats.service.js";
 import * as helpers from "../utils/helpers.js";
 
-/**
- * Sends a user's message to the Gemini API and handles the response.
- * @param {string} msg - The user's message text.
- * @param {object} db - The Dexie database instance.
- */
 export async function send(msg, db) {
     const settings = settingsService.getSettings();
     const selectedPersonality = await personalityService.getSelected();
-    
     if (!selectedPersonality) {
-        alert("Please select a personality before starting a chat.");
         return;
     }
     if (settings.apiKey === "") {
-        alert("Please enter an API key in the Settings tab.");
+        alert("Please enter an API key");
         return;
     }
     if (!msg) {
         return;
     }
-
-    // If this is the first message in a new chat, generate a title first.
-    if (!await chatsService.getCurrentChat(db)) {
-        const titleGenAI = new GoogleGenAI({ apiKey: settings.apiKey });
-        const response = await titleGenAI.models.generateContent({
-            model: 'gemini-2.0-flash', // Use a fast model for title generation
+    //model setup
+    const ai = new GoogleGenAI({ apiKey: settings.apiKey });
+    const config = {
+        maxOutputTokens: parseInt(settings.maxTokens),
+        temperature: settings.temperature / 100,
+        systemPrompt: settingsService.getSystemPrompt(),
+        safetySettings: settings.safetySettings,
+        responseMimeType: "text/plain"
+    };
+    
+    //user msg handling
+    //we create a new chat if there is none is currently selected
+    if (!await chatsService.getCurrentChat(db)) { 
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.0-flash',
             contents: "You are to act as a generator for chat titles. The user will send a query - you must generate a title for the chat based on it. Only reply with the short title, nothing else. The user's message is: " + msg,
         });
         const title = response.text;
         const id = await chatsService.addChat(title, null, db);
-        document.querySelector(`#chat${id}`).click(); // Select the newly created chat
+        document.querySelector(`#chat${id}`).click();
     }
-
     await insertMessage("user", msg, null, null, db);
     helpers.messageContainerScrollToBottom();
+    //model reply
     
-    // --- Model and History Setup ---
-    const ai = new GoogleGenAI({ apiKey: settings.apiKey });
-    const currentChat = await chatsService.getCurrentChat(db);
-
-    // 1. Construct the initial system prompt and personality instructions.
+    
+    // Create chat history
     const history = [
         {
             role: "user",
@@ -56,87 +57,79 @@ export async function send(msg, db) {
             parts: [{ text: "okie dokie. from now on, I will be acting as the personality you have chosen" }]
         }
     ];
-
-    // 2. Add tone examples to the history, if they exist.
+    
+    // Add tone examples if available
     if (selectedPersonality.toneExamples) {
         history.push(
-            ...selectedPersonality.toneExamples.map((tone) => ({ role: "model", parts: [{ text: tone }] }))
+            ...selectedPersonality.toneExamples.map((tone) => {
+                return { role: "model", parts: [{ text: tone }] }
+            })
         );
     }
-
-    // 3. Add the actual conversation history from the database.
+    
+    // Add chat history
+    const currentChat = await chatsService.getCurrentChat(db);
     history.push(
         ...currentChat.content.map((msg) => {
-            // The API expects only `role` and `parts`. We strip our custom `personality` property.
-            return { role: msg.role, parts: msg.parts };
+            return { role: msg.role, parts: msg.parts } //we remove the `personality` property as the API expects only `role` and `parts`
         })
     );
-
-    // --- API Call and Streaming Response ---
-    const chatSession = ai.chats.create({
+    
+    // Create chat session
+    const chat = ai.chats.create({
         model: settings.model,
         history: history,
-        config: {
-            maxOutputTokens: parseInt(settings.maxTokens),
-            temperature: settings.temperature / 100,
-            systemPrompt: settingsService.getSystemPrompt(),
-            safetySettings: settings.safetySettings,
-            responseMimeType: "text/plain"
-        }
+        config: config
     });
-
-    const stream = await chatSession.sendMessageStream({ message: msg });
-
-    // Insert a placeholder for the model's message, which will be filled by the stream.
-    const reply = await insertMessage("model", "", selectedPersonality.name, stream, db, selectedPersonality.image);
     
-    // After the stream is complete, save the full conversation to the database.
+    // Send message with streaming
+    const stream = await chat.sendMessageStream({
+        message: msg
+    });
+    
+    const reply = await insertMessage("model", "", selectedPersonality.name, stream, db, selectedPersonality.image);
+    //save chat history and settings
     currentChat.content.push({ role: "user", parts: [{ text: msg }] });
     currentChat.content.push({ role: "model", personality: selectedPersonality.name, personalityid: selectedPersonality.id, parts: [{ text: reply.md }] });
     await db.chats.put(currentChat);
     settingsService.saveSettings();
 }
 
-/**
- * Regenerates a model's response. It removes the previous user/model message pair
- * from the history and resubmits the user's message.
- * @param {HTMLElement} responseElement - The model's message element to be regenerated.
- * @param {object} db - The Dexie database instance.
- */
 async function regenerate(responseElement, db) {
-    const userMessage = responseElement.previousElementSibling.querySelector(".message-text").textContent;
+    //basically, we remove every message after the response we wish to regenerate, then send the message again.
+    const message = responseElement.previousElementSibling.querySelector(".message-text").textContent;
     const elementIndex = [...responseElement.parentElement.children].indexOf(responseElement);
     const chat = await chatsService.getCurrentChat(db);
 
-    // Remove the last user-model message pair from the history.
     chat.content = chat.content.slice(0, elementIndex - 1);
     await db.chats.put(chat);
-    
     await chatsService.loadChat(chat.id, db);
-    await send(userMessage, db);
+    await send(message, db);
 }
 
-/**
- * Sets up event listeners for editing a message in-place.
- * @param {HTMLElement} messageElement - The message element (.message).
- * @param {object} db - The Dexie database instance.
- */
+
+
 function setupMessageEditing(messageElement, db) {
     const editButton = messageElement.querySelector(".btn-edit");
     const saveButton = messageElement.querySelector(".btn-save");
     const messageText = messageElement.querySelector(".message-text");
-
+    
     if (!editButton || !saveButton) return;
-
-    // Handle 'Edit' button click
+    
+    // Handle edit button click
     editButton.addEventListener("click", () => {
+        // Enable editing
         messageText.setAttribute("contenteditable", "true");
         messageText.focus();
+        
+        // Show save button, hide edit button
         editButton.style.display = "none";
         saveButton.style.display = "inline-block";
-        messageText.dataset.originalContent = messageText.innerHTML; // Store original for cancellation
-
-        // Place cursor at the end of the text
+        
+        // Store original content to allow cancellation
+        messageText.dataset.originalContent = messageText.innerHTML;
+        
+        // Place cursor at the end
         const selection = window.getSelection();
         const range = document.createRange();
         range.selectNodeContents(messageText);
@@ -144,26 +137,33 @@ function setupMessageEditing(messageElement, db) {
         selection.removeAllRanges();
         selection.addRange(range);
     });
-
-    // Handle 'Save' button click
+    
+    // Handle save button click
     saveButton.addEventListener("click", async () => {
+        // Disable editing
         messageText.removeAttribute("contenteditable");
+        
+        // Show edit button, hide save button
         editButton.style.display = "inline-block";
         saveButton.style.display = "none";
         
+        // Get the message index to update the correct message in chat history
         const messageContainer = document.querySelector(".message-container");
         const messageIndex = Array.from(messageContainer.children).indexOf(messageElement);
+        
+        // Update the chat history in database
         await updateMessageInDatabase(messageElement, messageIndex, db);
     });
-
-    // Handle keyboard shortcuts
+    
+    // Handle keydown events in the editable message
     messageText.addEventListener("keydown", (e) => {
-        // Save on Enter (if Shift is not pressed)
+        // Save on Enter key (without shift for newlines)
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             saveButton.click();
         }
-        // Cancel on Escape
+        
+        // Cancel on Escape key
         if (e.key === "Escape") {
             messageText.innerHTML = messageText.dataset.originalContent;
             messageText.removeAttribute("contenteditable");
@@ -173,54 +173,51 @@ function setupMessageEditing(messageElement, db) {
     });
 }
 
-/**
- * Updates a specific message's content in the database.
- * @param {HTMLElement} messageElement - The message element being edited.
- * @param {number} messageIndex - The index of the message in the chat history.
- * @param {object} db - The Dexie database instance.
- */
 async function updateMessageInDatabase(messageElement, messageIndex, db) {
     if (!db) return;
+    
     try {
-        const messageHTML = messageElement.querySelector(".message-text").innerHTML;
-        const rawText = messageHTML.replace(/<[^>]*>/g, "").trim(); // Strip HTML for storage
+        // Get the updated message text
+        const messageText = messageElement.querySelector(".message-text").innerHTML;
+        const rawText = messageText.replace(/<[^>]*>/g, "").trim(); // Strip HTML for storing in parts
         
+        // Get the current chat and update the specific message
         const currentChat = await chatsService.getCurrentChat(db);
         if (!currentChat || !currentChat.content[messageIndex]) return;
-
+        
+        // Update the message content in the parts array
         currentChat.content[messageIndex].parts[0].text = rawText;
+        
+        // Save the updated chat back to the database
         await db.chats.put(currentChat);
-        console.log("Message updated in database.");
+        console.log("Message updated in database");
     } catch (error) {
         console.error("Error updating message in database:", error);
         alert("Failed to save your edited message. Please try again.");
     }
 }
 
-/**
- * Inserts a new message element into the DOM. Handles both user and model messages.
- * For model messages, it can process a live stream from the API.
- * @param {string} sender - 'user' or 'model'.
- * @param {string} msg - The initial message text (can be empty for streaming).
- * @param {string|null} selectedPersonalityTitle - The name of the personality speaking.
- * @param {object|null} netStream - The API stream object.
- * @param {object|null} db - The Dexie database instance.
- * @param {string|null} pfpSrc - The source URL for the profile picture.
- * @returns {Promise<object>|void} For streaming messages, returns an object with final HTML and Markdown.
- */
+
+
+
+// REPLACE your old insertMessage function with this new one.
+// REPLACE your insertMessage function with this final version.
 export async function insertMessage(sender, msg, selectedPersonalityTitle = null, netStream = null, db = null, pfpSrc = null) {
+    // Create new message div for the user's message then append to message container's top
     const newMessage = document.createElement("div");
     newMessage.classList.add("message");
     const messageContainer = document.querySelector(".message-container");
     messageContainer.append(newMessage);
 
-    if (sender !== "user") {
-        // --- Model Message ---
+    // Handle model's message
+    if (sender != "user") {
         newMessage.classList.add("message-model");
+        const messageRole = selectedPersonalityTitle;
+
         newMessage.innerHTML = `
             <div class="message-header">
                 <img class="pfp" src="${pfpSrc}" loading="lazy"></img>
-                <h3 class="message-role">${selectedPersonalityTitle}</h3>
+                <h3 class="message-role">${messageRole}</h3>
                 <div class="message-actions">
                     <button class="btn-edit btn-textual material-symbols-outlined">edit</button>
                     <button class="btn-save btn-textual material-symbols-outlined" style="display: none;">save</button>
@@ -232,25 +229,30 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
             <div class="message-text"></div>
         `;
 
-        newMessage.querySelector(".btn-refresh").addEventListener("click", async () => {
+        const refreshButton = newMessage.querySelector(".btn-refresh");
+        refreshButton.addEventListener("click", async () => {
             try {
                 await regenerate(newMessage, db);
             } catch (error) {
                 if (error.status === 429) {
-                    alert("Error: API rate limit reached. Please try again later or use the Flash model.");
-                } else {
-                    alert("An error occurred during regeneration. See console for details.");
+                    alert("Error, you have reached the API's rate limit. Please try again later or use the Flash model.");
+                    return;
                 }
+                alert("Error, please report this to the developer. You might need to restart the page to continue normal usage. Error: " + error);
                 console.error(error);
             }
         });
 
-        newMessage.querySelector(".btn-delete").addEventListener("click", () => deleteMessage(newMessage, db));
+        const deleteButton = newMessage.querySelector(".btn-delete");
+        if (deleteButton) {
+            deleteButton.addEventListener("click", () => deleteMessage(newMessage, db));
+        }
 
         const messageContent = newMessage.querySelector(".message-text");
 
-        if (netStream) {
-            // Handle streaming response
+        if (!netStream) {
+            messageContent.innerHTML = marked.parse(msg);
+        } else {
             let rawText = "";
             try {
                 for await (const chunk of netStream) {
@@ -260,60 +262,66 @@ export async function insertMessage(sender, msg, selectedPersonalityTitle = null
                         helpers.messageContainerScrollToBottom();
                     }
                 }
-                // Stream finished
                 hljs.highlightAll();
                 helpers.messageContainerScrollToBottom();
-                setupMessageEditing(newMessage, db);
+                setupMessageEditing(newMessage, db); 
                 return { HTML: messageContent.innerHTML, md: rawText };
             } catch (error) {
-                alert("Error processing stream response: " + error);
+                alert("Error processing response: " + error);
                 console.error("Stream error:", error);
                 return { HTML: messageContent.innerHTML, md: rawText };
             }
-        } else {
-            // Handle non-streaming response
-            messageContent.innerHTML = marked.parse(msg);
         }
         setupMessageEditing(newMessage, db);
-
     } else {
-        // --- User Message ---
+        // Add a specific class for user messages to make styling easier
         newMessage.classList.add("message-user");
+
+        const messageRole = "You:";
         newMessage.innerHTML = `
             <div class="message-header">
-                <h3 class="message-role">You:</h3>
+                <h3 class="message-role">${messageRole}</h3>
                 <div class="message-actions">
                     <button class="btn-edit btn-textual material-symbols-outlined">edit</button>
                     <button class="btn-save btn-textual material-symbols-outlined" style="display: none;">save</button>
+                    
+                    <!-- *** THIS ICON IS NOW 'refresh' INSTEAD OF 'replay' *** -->
                     <button class="btn-regenerate btn-textual material-symbols-outlined" title="Regenerate response">refresh</button>
+                    
                     <button class="btn-delete btn-textual material-symbols-outlined" title="Delete message">delete</button>
                 </div>
             </div>
             <div class="message-role-api" style="display: none;">${sender}</div>
             <div class="message-text">${helpers.getDecoded(msg)}</div>
         `;
-        
-        // This button regenerates the *next* message (the model's response)
-        const regenerateButton = newMessage.querySelector(".btn-regenerate");
-        regenerateButton?.addEventListener("click", async () => {
-            const botResponseElement = newMessage.nextElementSibling;
-            if (botResponseElement && botResponseElement.classList.contains('message-model')) {
-                await regenerate(botResponseElement, db);
-            }
-        });
 
-        newMessage.querySelector(".btn-delete")?.addEventListener("click", () => deleteMessage(newMessage, db));
-        
+        const regenerateButton = newMessage.querySelector(".btn-regenerate");
+        if (regenerateButton) {
+            regenerateButton.addEventListener("click", async () => {
+                const botResponseElement = newMessage.nextElementSibling;
+                if (botResponseElement && botResponseElement.classList.contains('message-model')) {
+                    await regenerate(botResponseElement, db);
+                }
+            });
+        }
+
+        const deleteButton = newMessage.querySelector(".btn-delete");
+        if (deleteButton) {
+            deleteButton.addEventListener("click", () => deleteMessage(newMessage, db));
+        }
+
         hljs.highlightAll();
         setupMessageEditing(newMessage, db);
     }
 }
 
-/**
- * Deletes a message from the DOM and the database.
- * @param {HTMLElement} messageElement - The message element to delete.
- * @param {object} db - The Dexie database instance.
- */
+
+    
+// Add this new function to services/Message.service.js
+
+// REPLACE your old deleteMessage function with this new one.
+
+// REPLACE your old deleteMessage function with this new one.
 async function deleteMessage(messageElement, db) {
     // ALWAYS confirm a destructive action!
     if (!confirm("Are you sure you want to delete this message? This cannot be undone.")) {
@@ -324,7 +332,8 @@ async function deleteMessage(messageElement, db) {
         const messageContainer = document.querySelector(".message-container");
         const currentChat = await chatsService.getCurrentChat(db);
         
-        // Find the message's index in the DOM to safely find it in the database.
+        // Find the index of the message in the DOM to find it in the database.
+        // This index corresponds to its position in the `currentChat.content` array.
         const messageIndex = Array.from(messageContainer.children).indexOf(messageElement);
 
         if (messageIndex === -1) {
@@ -333,6 +342,8 @@ async function deleteMessage(messageElement, db) {
         
         // Remove exactly ONE message from the chat history array in the database.
         currentChat.content.splice(messageIndex, 1);
+        
+        // Save the updated chat back to the database.
         await db.chats.put(currentChat);
         
         // --- THE ROBUST FIX ---
