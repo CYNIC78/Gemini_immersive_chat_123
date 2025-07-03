@@ -254,7 +254,15 @@ form { max-width: 100%; max-height: 100%; }
 .message-header { display: flex; align-items: center; gap: 1rem; }
 .message-header h3 { flex-grow: 1; }
 .message-actions { display: flex; gap: 0.5rem; align-items: center; }
-.message-text[contenteditable="true"] { outline: 1px dashed rgba(128, 128, 128, 0.5); padding: 0.5rem; border-radius: 0.5rem; }
+/* BUG FIX: Remove the dotted outline and add a subtle solid one for focused editable messages */
+.message-text[contenteditable="true"]:focus { outline: none; border: 1px solid var(--color-focus); padding: 0.5rem; border-radius: 0.5rem; box-sizing: border-box; margin-top: 0.85rem; }
+/* Original style with dotted outline removed from here */
+.message-text[contenteditable="true"] { 
+    /* The original padding and border-radius were already here, but moved to focus state */
+    /* If you want the subtle border always visible (even when not focused), put 'border: 1px solid transparent;' here */
+    /* and then change to --color-focus on :focus */
+}
+
 
 #gemini-pro-branding { font-family: Google Sans Display, sans-serif; color: #7c8a9c; font-size: 1rem; font-weight: 400; width: max-content; }
 #gemin-pro-logo { width: 2rem; height: 2rem; }
