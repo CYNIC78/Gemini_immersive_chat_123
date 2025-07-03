@@ -7,39 +7,26 @@ import * as helpers from "../utils/helpers.js";
 import * as characterScriptService from "./CharacterScript.service.js";
 
 
-
-
-
-// --- Helper Functions ---
-
-function createTypingIndicator(personality) {
-    const indicator = document.createElement("div");
-    indicator.classList.add("message", "message-model", "message-typing");
-    const defaultAvatar = personalityService.findDefaultAvatar(personality);
-    indicator.innerHTML = `
-        <div class="message-header">
-            <img class="pfp" src="${defaultAvatar}" loading="lazy">
-            <h3 class="message-role">${personality.name}</h3>
-        </div>
-        <div class="message-text"><i>Typing...</i></div>
-    `;
-    return indicator;
-}
-
-async function streamResponseToText(netStream) {
+// THIS FUNCTION IS NOW SMARTER! It streams text to the screen AND returns the full text.
+async function streamResponseToElement(messageElement, netStream) {
+    const messageContent = messageElement.querySelector(".message-text");
     let rawText = "";
     try {
         for await (const chunk of netStream) {
-            rawText += chunk.text();
+            const chunkText = chunk.text();
+            rawText += chunkText;
+            // This is the magic line that creates the typing effect!
+            messageContent.innerHTML = marked.parse(rawText, { breaks: true });
+            helpers.messageContainerScrollToBottom();
         }
+        hljs.highlightAll();
         return rawText;
     } catch (error) {
+        messageContent.innerHTML += `<br><br><strong style='color:red;'>Error during stream. Check console (F12).</strong>`;
         console.error("Stream error:", error);
-        return rawText + `\n<br><br><strong style='color:red;'>Error: Could not get response from model. See console (F12) for details.</strong>`;
+        return rawText;
     }
 }
-
-// --- End of Helper Functions ---
 
 
 function buildContentHistory(chat, stoppingIndex = null) {
@@ -66,10 +53,6 @@ export async function generateFirstMessage(db) {
         return;
     }
 
-    const typingIndicator = createTypingIndicator(selectedPersonality);
-    document.querySelector(".message-container").append(typingIndicator);
-    helpers.messageContainerScrollToBottom();
-
     let firstMessageUserContent = selectedPersonality.firstMessagePrompt;
     if (selectedPersonality.scenario && selectedPersonality.scenario.trim() !== "") {
         firstMessageUserContent = `Scenario: ${selectedPersonality.scenario}\n\nInstructions: ${firstMessageUserContent}`;
@@ -82,10 +65,13 @@ export async function generateFirstMessage(db) {
     
     const model = ai.getGenerativeModel({ model: settings.model, systemInstruction: fullSystemInstruction });
     const contents = [{ role: 'user', parts: [{ text: firstMessageUserContent }] }];
-    const result = await model.generateContentStream({ contents });
     
-    const rawText = await streamResponseToText(result.stream);
-    typingIndicator.remove();
+    // Create the placeholder message bubble first
+    const placeholder = await insertMessage({ role: 'model' }, currentChat.content.length, db, selectedPersonality);
+    
+    // Stream the response directly into the placeholder
+    const result = await model.generateContentStream({ contents });
+    const rawText = await streamResponseToElement(placeholder, result.stream);
 
     let modifiedText = rawText;
     let displayPersonality = { ...selectedPersonality, image: personalityService.findDefaultAvatar(selectedPersonality) };
@@ -116,8 +102,8 @@ export async function generateFirstMessage(db) {
     currentChat.content.push(modelMessage);
     await db.chats.put(currentChat);
     
-    await insertMessage(modelMessage, currentChat.content.length - 1, db, displayPersonality);
-    helpers.messageContainerScrollToBottom();
+    // Final update of the message bubble with script-modified data
+    await chatsService.loadChat(currentChat.id, db);
 }
 
 export async function send(msg, db) {
@@ -149,20 +135,17 @@ export async function send(msg, db) {
     currentChat.content.push(userMessage);
     await insertMessage(userMessage, currentChat.content.length - 1, db);
     helpers.messageContainerScrollToBottom();
-    
-    const typingIndicator = createTypingIndicator(selectedPersonality);
-    document.querySelector(".message-container").append(typingIndicator);
-    helpers.messageContainerScrollToBottom();
 
     const mainSystemPrompt = settingsService.getSystemPrompt();
     const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
     const fullSystemInstruction = mainSystemPrompt + "\n\n" + characterPrompt;
     
     const model = ai.getGenerativeModel({ model: settings.model, systemInstruction: fullSystemInstruction });
-    const result = await model.generateContentStream({ contents });
     
-    const rawText = await streamResponseToText(result.stream);
-    typingIndicator.remove();
+    // Create placeholder and stream into it
+    const placeholder = await insertMessage({ role: 'model' }, currentChat.content.length, db, selectedPersonality);
+    const result = await model.generateContentStream({ contents });
+    const rawText = await streamResponseToElement(placeholder, result.stream);
 
     let modifiedText = rawText;
     let displayPersonality = { ...selectedPersonality, image: personalityService.findDefaultAvatar(selectedPersonality) };
@@ -193,8 +176,8 @@ export async function send(msg, db) {
     currentChat.content.push(modelMessage);
     await db.chats.put(currentChat);
     
-    await insertMessage(modelMessage, currentChat.content.length - 1, db, displayPersonality);
-    helpers.messageContainerScrollToBottom();
+    // Final update after script runs
+    await chatsService.loadChat(currentChat.id, db);
 }
 
 async function regenerate(messageIndex, db) {
@@ -205,8 +188,7 @@ async function regenerate(messageIndex, db) {
     let userMessageText = "";
 
     const messageElement = document.querySelector(`.message[data-index="${messageIndex}"]`);
-    messageElement.querySelector('.message-text').innerHTML = "<i>Regenerating...</i>";
-
+    
     if (messageIndex === 0) {
         let firstMessageUserContent = selectedPersonality.firstMessagePrompt;
         if (selectedPersonality.scenario && selectedPersonality.scenario.trim() !== "") {
@@ -232,20 +214,18 @@ async function regenerate(messageIndex, db) {
     const ai = new GoogleGenerativeAI(settings.apiKey);
     const model = ai.getGenerativeModel({ model: settings.model, systemInstruction: fullSystemInstruction });
 
+    // Stream directly into the existing message element
     const result = await model.generateContentStream({ contents });
-    const rawText = await streamResponseToText(result.stream);
+    const rawText = await streamResponseToElement(messageElement, result.stream);
     
     let modifiedText = rawText;
-    let finalImage = personalityService.findDefaultAvatar(selectedPersonality);
     
     if (selectedPersonality.customScript && selectedPersonality.customScript.trim() !== "") {
         const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, userMessageText);
         modifiedText = scriptResult.modelResponse;
         
         if (scriptResult.character && scriptResult.character.image) {
-            finalImage = scriptResult.character.image;
-            // *** NEW LOGIC HERE ***
-            // Only update the main sidebar card if this is the LAST message.
+            const finalImage = scriptResult.character.image;
             const isLastMessage = messageIndex === currentChat.content.length - 1;
             if (isLastMessage) {
                 const characterCard = document.querySelector(`#personality-${selectedPersonality.id}`);
@@ -254,6 +234,9 @@ async function regenerate(messageIndex, db) {
                     if (cardImage) cardImage.src = finalImage;
                 }
             }
+            // Update the message bubble's avatar directly
+            const pfpElement = messageElement.querySelector('.pfp');
+            pfpElement.src = finalImage;
         }
     }
 
@@ -262,20 +245,11 @@ async function regenerate(messageIndex, db) {
     modelMessage.activeVersion = modelMessage.versions.length - 1;
     await db.chats.put(currentChat);
 
-    const pfpElement = messageElement.querySelector('.pfp');
-    const textElement = messageElement.querySelector('.message-text');
-    const swiperElement = messageElement.querySelector('.version-swiper');
-    
-    pfpElement.src = finalImage;
-    textElement.innerHTML = marked.parse(modifiedText, { breaks: true });
-    hljs.highlightAll();
-
-    if (swiperElement) {
-        swiperElement.querySelector('span').textContent = `${modelMessage.activeVersion + 1}/${modelMessage.versions.length}`;
-    } else {
-        await chatsService.loadChat(currentChat.id, db);
-    }
+    // Final update of the text and swiper
+    await chatsService.loadChat(currentChat.id, db);
 }
+
+// ... the rest of the file remains the same ...
 
 async function regenerateUserMessage(userMessageIndex, db) {
     // This logic can also be improved, but let's focus on the main regenerate first.
