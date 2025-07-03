@@ -123,6 +123,28 @@ export function newChat() {
     }
 }
 
+// --- NEW FUNCTION TO START A CHAT WITH A PERSONALITY'S FIRST MESSAGE ---
+export async function startChatWithPersonality(db) {
+    const selectedPersonality = await personalityService.getSelected();
+    if (!selectedPersonality || !selectedPersonality.firstMessagePrompt) {
+        console.warn("Attempted to start chat with personality, but no firstMessagePrompt found.");
+        return;
+    }
+
+    // Generate a simple title.
+    const title = `Chat with ${selectedPersonality.name}`;
+
+    // Create a new, empty chat and get its ID.
+    const id = await addChat(title, null, db);
+
+    // Make the new chat active.
+    document.querySelector(`#chat${id}`).click();
+
+    // Now, call the message service to generate the actual first message.
+    // We will create this function in the very next step!
+    await messageService.generateFirstMessage(db);
+}
+
 export async function loadChat(chatID, db) {
     try {
         if (!chatID) {

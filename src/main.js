@@ -112,18 +112,23 @@ const hideOverlayButton = document.querySelector("#btn-hide-overlay");
 hideOverlayButton.addEventListener("click", () => overlayService.closeOverlay());
 
 const newChatButton = document.querySelector("#btn-new-chat");
-newChatButton.addEventListener("click", () => {
-    if (!chatsService.getCurrentChatId()) {
-        return
+// --- UPDATED NEW CHAT LOGIC ---
+newChatButton.addEventListener("click", async () => {
+    const selectedPersonality = await personalityService.getSelected();
+    
+    // Check if the personality has a first message prompt.
+    if (selectedPersonality.firstMessagePrompt && selectedPersonality.firstMessagePrompt.trim() !== "") {
+        // If yes, use the new function to start the chat with the character's message.
+        await chatsService.startChatWithPersonality(db);
+    } else {
+        // If no, use the existing logic for a blank new chat.
+        if (!chatsService.getCurrentChatId()) {
+            return;
+        }
+        chatsService.newChat();
     }
-    chatsService.newChat();
 });
-
-
-
-
-
-
+// --- END OF UPDATE ---
 
 const clearAllButton = document.querySelector("#btn-clearall-personality");
 clearAllButton.addEventListener("click", () => {
