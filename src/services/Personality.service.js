@@ -33,8 +33,9 @@ export async function migratePersonalities(database) {
 }
 
 export async function initialize() {
-    //default personality setup - only insert, don't click here. Selection will be handled by main.js
-    insert(getDefault());
+    //default personality setup
+    const defaultPersonalityCard = insert(getDefault());
+    defaultPersonalityCard.querySelector("input").click();
 
     //load all personalities from local storage
     const personalitiesArray = await getAll();
@@ -50,6 +51,8 @@ export async function initialize() {
 }
 
 export async function getSelected() {
+    // --- THIS IS THE FIX ---
+    // The string now correctly ends with a double quote.
     const selectedRadio = document.querySelector("input[name='personality']:checked");
     if (!selectedRadio) return getDefault(); // Failsafe
 
@@ -66,6 +69,7 @@ export async function getSelected() {
 }
 
 export function getDefault() {
+    // UPDATED: Added empty strings for the new fields to match the updated Personality model.
     return new Personality(
         'Aphrodite', 
         '/assets/default/images/Aphrodite.png',
@@ -125,10 +129,6 @@ export async function remove(id) {
         return;
     }
     await db.personalities.delete(id);
-    // If the removed personality was the last selected, clear it from local storage
-    if (loadLastSelectedPersonalityId() === id) {
-        saveSelectedPersonalityId(null); // Clear the stored ID
-    }
 }
 
 function insert(personality) {
@@ -178,7 +178,6 @@ export async function removeAll() {
             node.remove();
         }
     });
-    saveSelectedPersonalityId(null); // Clear last selected personality when all are removed
 }
 
 export async function add(personality) {
@@ -215,7 +214,7 @@ export function generateCard(personality) {
 
     card.innerHTML = `
             <img class="background-img" src="${personality.image}"></img>
-            <input type="radio" name="personality" value="${personality.name}">
+            <input  type="radio" name="personality" value="${personality.name}">
             <div class="btn-array-personalityactions">
                 ${personality.id ? `<button class="btn-textual btn-edit-card material-symbols-outlined" 
                     id="btn-edit-personality-${personality.name}">edit</button>` : ''}
@@ -243,8 +242,7 @@ export function generateCard(personality) {
         deleteButton.addEventListener("click", () => {
             //first if the personality to delete is the one currently selected, we select the default personality
             if (input.checked) {
-                // We don't click anything here; main.js will re-evaluate on next load,
-                // or the remove function will clear the stored ID.
+                document.querySelector("#personalitiesDiv").firstElementChild.click();
             }
             if (personality.id) {
                 remove(personality.id);
@@ -257,32 +255,5 @@ export function generateCard(personality) {
             overlayService.showEditPersonalityForm(personality);
         });
     }
-
-    // NEW: Add event listener to save selected personality ID
-    input.addEventListener("change", () => {
-        saveSelectedPersonalityId(personality.id || -1); // Save the ID when selected
-    });
-
     return card;
-}
-
-/**
- * Saves the ID of the currently selected personality to local storage.
- * @param {number|null} id The ID of the personality, or null to clear.
- */
-export function saveSelectedPersonalityId(id) {
-    if (id === null) {
-        localStorage.removeItem('lastSelectedPersonalityId');
-    } else {
-        localStorage.setItem('lastSelectedPersonalityId', id);
-    }
-}
-
-/**
- * Loads the last selected personality ID from local storage.
- * @returns {number|null} The ID of the last selected personality, or null if none found.
- */
-export function loadLastSelectedPersonalityId() {
-    const id = localStorage.getItem('lastSelectedPersonalityId');
-    return id ? parseInt(id) : null;
 }
