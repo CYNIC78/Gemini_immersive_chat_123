@@ -162,12 +162,43 @@
                     </div>
                     <h3>User Experience</h3>
                     <div>
-                        <!-- autoscroll toggle -->
                          <div style="display: flex; gap: 0.25rem; align-items: center;">
                             <input id="autoscroll" type="checkbox" name="autoscrollEnabled"></input>
                             <label for="autoscroll">Autoscroll</label>
                         </div>
                     </div>
+
+                    <!-- START: New Color Scheme Section -->
+                    <h3>Color Scheme</h3>
+                    <div class="color-settings">
+                        <div class="setting-row">
+                            <label for="colorPrimaryBg">Primary Background</label>
+                            <input type="color" id="colorPrimaryBg">
+                        </div>
+                        <div class="setting-row">
+                            <label for="colorSecondaryBg">Secondary Background</label>
+                            <input type="color" id="colorSecondaryBg">
+                        </div>
+                        <div class="setting-row">
+                            <label for="colorTertiaryBg">Input/Box Background</label>
+                            <input type="color" id="colorTertiaryBg">
+                        </div>
+                        <div class="setting-row">
+                            <label for="colorPrimaryText">Primary Text</label>
+                            <input type="color" id="colorPrimaryText">
+                        </div>
+                        <div class="setting-row">
+                            <label for="colorAccent">Accent / Buttons</label>
+                            <input type="color" id="colorAccent">
+                        </div>
+                        <div class="setting-row">
+                            <label for="colorButtonText">Button Text</label>
+                            <input type="color" id="colorButtonText">
+                        </div>
+                        <button id="btn-reset-colors" style="margin-top: 1rem;">Reset to Theme Defaults</button>
+                    </div>
+                    <!-- END: New Color Scheme Section -->
+
                     <h3>Donate</h3>
                     <div class="btn-array">
                         <a href="https://patreon.com/faetalize" target="_blank" rel="noopener noreferrer"

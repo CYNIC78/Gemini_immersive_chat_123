@@ -13,39 +13,44 @@ const temperatureInput = document.querySelector("#temperature");
 const modelSelect = document.querySelector("#selectedModel");
 const autoscrollToggle = document.querySelector("#autoscroll");
 
+// Color Scheme
+const colorPrimaryBgInput = document.querySelector("#colorPrimaryBg");
+const colorSecondaryBgInput = document.querySelector("#colorSecondaryBg");
+const colorTertiaryBgInput = document.querySelector("#colorTertiaryBg");
+const colorPrimaryTextInput = document.querySelector("#colorPrimaryText");
+const colorAccentInput = document.querySelector("#colorAccent");
+const colorButtonTextInput = document.querySelector("#colorButtonText");
+const btnResetColors = document.querySelector("#btn-reset-colors");
+
 // --- State ---
 let apiKeys = [];
 let activeApiKeyIndex = 0;
 
 // --- Initialization ---
 export function initialize() {
-    // The old single API key input is gone, so we find our new elements.
-    // If any of these are null, it means the HTML hasn't updated, and we stop.
-    if (!apiKeySelector || !newApiKeyInput || !btnAddKey || !btnDeleteKey) {
-        console.error("Could not find new API Key management elements in the HTML. Aborting settings initialization.");
-        return;
-    }
     loadApiKeys();
     loadOtherSettings();
     setupEventListeners();
+    initializeColorSettings(); // New function call for colors
 }
 
 function setupEventListeners() {
     // API Key Listeners
-    btnAddKey.addEventListener("click", addApiKey);
-    btnDeleteKey.addEventListener("click", deleteActiveApiKey);
-    apiKeySelector.addEventListener("change", setActiveApiKey);
+    if (btnAddKey) btnAddKey.addEventListener("click", addApiKey);
+    if (btnDeleteKey) btnDeleteKey.addEventListener("click", deleteActiveApiKey);
+    if (apiKeySelector) apiKeySelector.addEventListener("change", setActiveApiKey);
 
     // Other Setting Listeners
-    maxTokensInput.addEventListener("input", saveOtherSettings);
-    temperatureInput.addEventListener("input", saveOtherSettings);
-    modelSelect.addEventListener("change", saveOtherSettings);
-    autoscrollToggle.addEventListener("change", saveOtherSettings);
+    if (maxTokensInput) maxTokensInput.addEventListener("input", saveOtherSettings);
+    if (temperatureInput) temperatureInput.addEventListener("input", saveOtherSettings);
+    if (modelSelect) modelSelect.addEventListener("change", saveOtherSettings);
+    if (autoscrollToggle) autoscrollToggle.addEventListener("change", saveOtherSettings);
 }
 
 // --- API Key Management Functions ---
 
 function loadApiKeys() {
+    if (!apiKeySelector) return; // Guard clause
     const storedKeys = localStorage.getItem("API_KEYS");
     apiKeys = storedKeys ? JSON.parse(storedKeys) : [];
 
@@ -81,7 +86,6 @@ function renderApiKeysDropdown() {
 
     apiKeys.forEach((key, index) => {
         const option = document.createElement('option');
-        // Mask the key for display: "Key 1 (AIza...wE1s)"
         const maskedKey = `Key ${index + 1} (${key.substring(0, 4)}...${key.substring(key.length - 4)})`;
         option.textContent = maskedKey;
         option.value = index;
@@ -99,11 +103,10 @@ function addApiKey() {
             return;
         }
         apiKeys.push(newKey);
-        // If this is the first key being added, make it active.
         if (apiKeys.length === 1) {
             activeApiKeyIndex = 0;
         }
-        newApiKeyInput.value = ''; // Clear the input field
+        newApiKeyInput.value = '';
         saveApiKeys();
         renderApiKeysDropdown();
     } else {
@@ -113,17 +116,12 @@ function addApiKey() {
 
 function deleteActiveApiKey() {
     if (apiKeys.length === 0) return;
-
     const selectedIndex = parseInt(apiKeySelector.value, 10);
-
     if (confirm(`Are you sure you want to delete ${apiKeySelector.options[selectedIndex].text}?`)) {
         apiKeys.splice(selectedIndex, 1);
-
-        // Adjust the active index if the deleted key was the active one or before it
         if (activeApiKeyIndex >= selectedIndex && activeApiKeyIndex > 0) {
              activeApiKeyIndex = Math.max(0, apiKeys.length - 1);
         }
-
         saveApiKeys();
         renderApiKeysDropdown();
     }
@@ -137,6 +135,7 @@ function setActiveApiKey() {
 // --- Other Settings Management ---
 
 function loadOtherSettings() {
+    if (!maxTokensInput) return; // Guard clause
     maxTokensInput.value = localStorage.getItem("maxTokens") || 1000;
     temperatureInput.value = localStorage.getItem("TEMPERATURE") || 70;
     modelSelect.value = localStorage.getItem("model") || "gemini-2.5-flash-preview-04-17";
@@ -150,12 +149,102 @@ function saveOtherSettings() {
     localStorage.setItem("autoscroll", autoscrollToggle.checked);
 }
 
+
+// --- Color Scheme Management ---
+
+const defaultColors = {
+    dark: {
+        '--color-background-primary': '#151e24',
+        '--color-background-secondary': '#1a2733',
+        '--color-background-tertiary': '#283542',
+        '--color-text-primary': '#d1d5db',
+        '--color-accent': '#5f96c8',
+        '--color-text-button': '#0b2469',
+    },
+    light: {
+        '--color-background-primary': '#f0f6ff',
+        '--color-background-secondary': '#d2e2f7',
+        '--color-background-tertiary': '#f0f6ff',
+        '--color-text-primary': '#0a0a0a',
+        '--color-accent': '#4c7cbe',
+        '--color-text-button': '#edf1f8',
+    }
+};
+
+function applyColors(colors) {
+    // Apply the colors as CSS variables on the root <html> element
+    for (const [key, value] of Object.entries(colors)) {
+        document.documentElement.style.setProperty(key, value);
+    }
+    // Also update the color picker inputs to show the current colors
+    colorPrimaryBgInput.value = colors['--color-background-primary'];
+    colorSecondaryBgInput.value = colors['--color-background-secondary'];
+    colorTertiaryBgInput.value = colors['--color-background-tertiary'];
+    colorPrimaryTextInput.value = colors['--color-text-primary'];
+    colorAccentInput.value = colors['--color-accent'];
+    colorButtonTextInput.value = colors['--color-text-button'];
+}
+
+function saveAndApplyCurrentColors() {
+    const currentColors = {
+        '--color-background-primary': colorPrimaryBgInput.value,
+        '--color-background-secondary': colorSecondaryBgInput.value,
+        '--color-background-tertiary': colorTertiaryBgInput.value,
+        '--color-text-primary': colorPrimaryTextInput.value,
+        '--color-accent': colorAccentInput.value,
+        '--color-text-button': colorButtonTextInput.value,
+    };
+    localStorage.setItem("customColors", JSON.stringify(currentColors));
+    applyColors(currentColors);
+}
+
+function loadAndApplyColors() {
+    const savedColors = localStorage.getItem("customColors");
+    if (savedColors) {
+        // If the user has saved custom colors, apply them
+        applyColors(JSON.parse(savedColors));
+    } else {
+        // Otherwise, apply the default colors based on their OS theme (light/dark)
+        const theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        applyColors(defaultColors[theme]);
+    }
+}
+
+function resetColors() {
+    if (confirm("Are you sure you want to reset your custom colors to the theme defaults?")) {
+        localStorage.removeItem("customColors");
+        // A simple page reload is the most reliable way to revert to stylesheet defaults
+        window.location.reload();
+    }
+}
+
+function initializeColorSettings() {
+    if (!colorPrimaryBgInput) return; // Don't run if the HTML isn't updated
+
+    loadAndApplyColors();
+
+    const colorInputs = [colorPrimaryBgInput, colorSecondaryBgInput, colorTertiaryBgInput, colorPrimaryTextInput, colorAccentInput, colorButtonTextInput];
+    colorInputs.forEach(input => {
+        input.addEventListener('input', saveAndApplyCurrentColors);
+    });
+
+    btnResetColors.addEventListener('click', resetColors);
+
+    // This listener handles the case where a user changes their OS theme (e.g., from light to dark)
+    // while they are using the app, but only if they haven't set a custom theme.
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+        if (!localStorage.getItem("customColors")) {
+             const newTheme = event.matches ? 'dark' : 'light';
+             applyColors(defaultColors[newTheme]);
+        }
+    });
+}
+
+
 // --- Public Functions ---
 
 export function getSettings() {
-    // Get the currently active API key
     const activeKey = apiKeys.length > 0 ? apiKeys[activeApiKeyIndex] : null;
-
     return {
         apiKey: activeKey,
         maxTokens: maxTokensInput.value,
