@@ -6,6 +6,28 @@ import * as chatsService from "./Chats.service.js";
 import * as helpers from "../utils/helpers.js";
 import * as characterScriptService from "./CharacterScript.service.js";
 
+
+// Typing Speed in milliseconds per character
+const TYPING_SPEED = 20; // Adjust this value to control speed
+
+// Typing Effect Function
+async function displayTextWithTypingEffect(container, text, typingSpeed = TYPING_SPEED) {
+    container.innerHTML = "";
+    for (let i = 0; i < text.length; i++) {
+        container.innerHTML += text[i];
+        container.scrollTop = container.scrollHeight;
+        await new Promise(resolve => setTimeout(resolve, typingSpeed));
+    }
+    hljs.highlightAll();
+}
+
+
+
+
+
+
+
+
 // --- Helper Functions ---
 
 function createTypingIndicator(personality) {
@@ -193,6 +215,8 @@ export async function send(msg, db) {
     helpers.messageContainerScrollToBottom();
 }
 
+
+
 async function regenerate(messageIndex, db) {
     const settings = settingsService.getSettings();
     const selectedPersonality = await personalityService.getSelected();
@@ -280,6 +304,7 @@ async function regenerateUserMessage(userMessageIndex, db) {
     // The rest of this function will now use the reloaded data, ensuring consistency.
 }
 
+// Modified insertMessage
 export async function insertMessage(msgObj, index, db, personality = null) {
     const newMessage = document.createElement("div");
     newMessage.classList.add("message");
@@ -291,7 +316,7 @@ export async function insertMessage(msgObj, index, db, personality = null) {
         newMessage.classList.add("message-model");
         const pfpSrc = (personality && personality.image) || (personality ? personalityService.findDefaultAvatar(personality) : '');
         const messageRole = personality ? personality.name : 'Model';
-        
+
         const hasVersions = msgObj.versions && msgObj.versions.length > 1;
         const activeVersion = msgObj.activeVersion !== undefined ? msgObj.activeVersion : 0;
         const versionText = msgObj.versions ? msgObj.versions[activeVersion].text : "";
@@ -306,13 +331,16 @@ export async function insertMessage(msgObj, index, db, personality = null) {
                     <button class="btn-delete btn-textual material-symbols-outlined" title="Delete message">delete</button>
                 </div>
             </div>
-            <div class="message-text" contenteditable="true">${marked.parse(versionText, { breaks: true })}</div>`;
+            <div class="message-text" contenteditable="true"></div>`;
+
         hljs.highlightAll();
 
         newMessage.querySelector(".btn-refresh").addEventListener("click", () => regenerate(index, db));
         newMessage.querySelector(".btn-delete").addEventListener("click", () => deleteMessage(index, db));
-        
+
         const messageContentEl = newMessage.querySelector(".message-text");
+        await displayTextWithTypingEffect(messageContentEl, marked.parse(versionText, { breaks: true }));
+
         messageContentEl.addEventListener("blur", async () => {
             const currentChat = await chatsService.getCurrentChat(db);
             currentChat.content[index].versions[currentChat.content[index].activeVersion].text = messageContentEl.textContent;
@@ -320,13 +348,13 @@ export async function insertMessage(msgObj, index, db, personality = null) {
             messageContentEl.innerHTML = marked.parse(messageContentEl.textContent, { breaks: true });
             hljs.highlightAll();
         });
-        
-        if(hasVersions) {
+
+        if (hasVersions) {
             newMessage.querySelector(".btn-version-prev").addEventListener("click", () => switchVersion(index, -1, db));
             newMessage.querySelector(".btn-version-next").addEventListener("click", () => switchVersion(index, 1, db));
         }
 
-    } else { // User message
+    } else {
         newMessage.classList.add("message-user");
         newMessage.innerHTML = `
             <div class="message-header"><h3 class="message-role">You</h3><div class="message-actions">
@@ -334,11 +362,11 @@ export async function insertMessage(msgObj, index, db, personality = null) {
                 <button class="btn-delete btn-textual material-symbols-outlined" title="Delete message">delete</button>
             </div></div>
             <div class="message-text" contenteditable="true">${marked.parse(msgObj.parts[0].text, { breaks: true })}</div>`;
-        
+
         const messageContentEl = newMessage.querySelector(".message-text");
         newMessage.querySelector(".btn-refresh").addEventListener("click", () => regenerateUserMessage(index, db));
         newMessage.querySelector(".btn-delete").addEventListener("click", () => deleteMessage(index, db));
-        
+
         messageContentEl.addEventListener("blur", async () => {
             const currentChat = await chatsService.getCurrentChat(db);
             currentChat.content[index].parts[0].text = messageContentEl.textContent;
@@ -349,6 +377,7 @@ export async function insertMessage(msgObj, index, db, personality = null) {
     }
     return newMessage;
 }
+
 
 async function switchVersion(messageIndex, direction, db) {
     const currentChat = await chatsService.getCurrentChat(db);
