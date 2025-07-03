@@ -87,7 +87,6 @@ export async function generateFirstMessage(db) {
     let displayPersonality = { ...selectedPersonality, image: personalityService.findDefaultAvatar(selectedPersonality) };
 
     if (selectedPersonality.customScript && selectedPersonality.customScript.trim() !== "") {
-        // FIXED: Correct argument order
         const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, firstMessageUserContent);
         modifiedText = scriptResult.modelResponse;
         const finalImage = scriptResult.character.image || personalityService.findDefaultAvatar(selectedPersonality);
@@ -165,7 +164,6 @@ export async function send(msg, db) {
     let displayPersonality = { ...selectedPersonality, image: personalityService.findDefaultAvatar(selectedPersonality) };
 
     if (selectedPersonality.customScript && selectedPersonality.customScript.trim() !== "") {
-        // FIXED: Correct argument order
         const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, msg);
         modifiedText = scriptResult.modelResponse;
         const finalImage = scriptResult.character.image || personalityService.findDefaultAvatar(selectedPersonality);
@@ -202,6 +200,9 @@ async function regenerate(messageIndex, db) {
     let contents = [];
     let userMessageText = "";
 
+    const messageElement = document.querySelector(`.message[data-index="${messageIndex}"]`);
+    messageElement.querySelector('.message-text').innerHTML = "<i>Regenerating...</i>";
+
     if (messageIndex === 0) {
         let firstMessageUserContent = selectedPersonality.firstMessagePrompt;
         if (selectedPersonality.scenario && selectedPersonality.scenario.trim() !== "") {
@@ -231,30 +232,51 @@ async function regenerate(messageIndex, db) {
     const rawText = await streamResponseToText(result.stream);
     
     let modifiedText = rawText;
+    let finalImage = personalityService.findDefaultAvatar(selectedPersonality);
     
     if (selectedPersonality.customScript && selectedPersonality.customScript.trim() !== "") {
-        // FIXED: Correct argument order
         const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, userMessageText);
         modifiedText = scriptResult.modelResponse;
         
         if (scriptResult.character && scriptResult.character.image) {
+            finalImage = scriptResult.character.image;
             const characterCard = document.querySelector(`#personality-${selectedPersonality.id}`);
             if (characterCard) {
                 const cardImage = characterCard.querySelector('.background-img');
-                if (cardImage) cardImage.src = scriptResult.character.image;
+                if (cardImage) cardImage.src = finalImage;
             }
         }
     }
 
+    // Update the data in the database
     const modelMessage = currentChat.content[messageIndex];
     modelMessage.versions.push({ text: modifiedText });
     modelMessage.activeVersion = modelMessage.versions.length - 1;
-
     await db.chats.put(currentChat);
-    await chatsService.loadChat(currentChat.id, db);
+
+    // --- NEW: Update the UI directly ---
+    const pfpElement = messageElement.querySelector('.pfp');
+    const textElement = messageElement.querySelector('.message-text');
+    const swiperElement = messageElement.querySelector('.version-swiper');
+    
+    pfpElement.src = finalImage;
+    textElement.innerHTML = marked.parse(modifiedText, { breaks: true });
+    hljs.highlightAll();
+
+    // Update or create the version swiper
+    if (swiperElement) {
+        swiperElement.querySelector('span').textContent = `${modelMessage.activeVersion + 1}/${modelMessage.versions.length}`;
+    } else {
+         // This is a simplified version, as adding the full swiper dynamically is complex.
+         // For now, reloading is a good enough compromise if the swiper didn't exist before.
+        await chatsService.loadChat(currentChat.id, db);
+    }
 }
 
 async function regenerateUserMessage(userMessageIndex, db) {
+    // This is a complex function, for now we will use the simpler reload method
+    // to ensure stability. We can revisit making this more efficient later.
+    await chatsService.loadChat(chatsService.getCurrentChatId(), db);
     const settings = settingsService.getSettings();
     const selectedPersonality = await personalityService.getSelected();
     let currentChat = await chatsService.getCurrentChat(db);
@@ -274,7 +296,6 @@ async function regenerateUserMessage(userMessageIndex, db) {
     let modifiedText = rawText;
     
     if (selectedPersonality.customScript && selectedPersonality.customScript.trim() !== "") {
-        // FIXED: Correct argument order
         const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, userMessage.parts[0].text);
         modifiedText = scriptResult.modelResponse;
         
