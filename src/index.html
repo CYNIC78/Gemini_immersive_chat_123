@@ -76,17 +76,30 @@
                 </div>
 
                 <div class="sidebar-section">
-                    <h3>API Key</h3>
-                    <div class="api-key">
-                        <input type="password" autocomplete="off" placeholder="Paste API key here" id="apiKeyInput"
-                            class="input-field"></input>
-                        <button class="material-symbols-outlined btn-textual" onclick="window.open('https://aistudio.google.com/app/apikey', '_blank')">
-                            help
-                        </button>
-                    </div>
-                    <div class="api-key-error">
-                        <span class="material-symbols-outlined">error</span> Invalid API Key
-                    </div>
+					<!-- START: API Key Management Section -->
+					<h3>API Key Management</h3>
+					<div class="api-key-manager">
+						<div class="setting-row">
+							<label for="apiKeySelector" class="setting-label"><span class="material-symbols-outlined">key</span>Active Key</label>
+							<div class="input-with-button" style="display: flex; align-items: center; gap: 4px;">
+								<select id="apiKeySelector" class="input-field" style="flex-grow: 1;"></select>
+								<button id="btn-delete-key" class="material-symbols-outlined btn-textual" title="Delete selected key">delete</button>
+							</div>
+						</div>
+						<div class="setting-row" style="margin-top: 1rem;">
+							<label for="newApiKeyInput" class="setting-label"><span class="material-symbols-outlined">add</span>Add New Key</label>
+							<div class="input-with-button" style="display: flex; align-items: center; gap: 4px;">
+								<input type="password" autocomplete="off" placeholder="Paste new API key here" id="newApiKeyInput" class="input-field" style="flex-grow: 1;">
+								<button id="btn-add-key" class="material-symbols-outlined btn-textual" title="Add new key">add_circle</button>
+								<button class="material-symbols-outlined btn-textual" title="Get an API key" onclick="window.open('https://aistudio.google.com/app/apikey', '_blank')">help</button>
+							</div>
+						</div>
+					</div>
+					<div class="api-key-error">
+						<span class="material-symbols-outlined">error</span> Invalid API Key
+					</div>
+					<!-- END: API Key Management Section -->
+					
                     <h3>Generation Settings</h3>
                     <div class="generation-settings">
                         <div>

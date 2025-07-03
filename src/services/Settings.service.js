@@ -1,40 +1,163 @@
 import { HarmBlockThreshold, HarmCategory } from "@google/generative-ai";
 
-const ApiKeyInput = document.querySelector("#apiKeyInput");
+// --- DOM Element Selectors ---
+// API Key Management
+const apiKeySelector = document.querySelector("#apiKeySelector");
+const newApiKeyInput = document.querySelector("#newApiKeyInput");
+const btnAddKey = document.querySelector("#btn-add-key");
+const btnDeleteKey = document.querySelector("#btn-delete-key");
+
+// Other Settings
 const maxTokensInput = document.querySelector("#maxTokens");
 const temperatureInput = document.querySelector("#temperature");
 const modelSelect = document.querySelector("#selectedModel");
 const autoscrollToggle = document.querySelector("#autoscroll");
 
+// --- State ---
+let apiKeys = [];
+let activeApiKeyIndex = 0;
+
+// --- Initialization ---
 export function initialize() {
-    loadSettings();
-    ApiKeyInput.addEventListener("input", saveSettings);
-    maxTokensInput.addEventListener("input", saveSettings);
-    temperatureInput.addEventListener("input", saveSettings);
-    modelSelect.addEventListener("change", saveSettings);
-    autoscrollToggle.addEventListener("change", saveSettings);
+    // The old single API key input is gone, so we find our new elements.
+    // If any of these are null, it means the HTML hasn't updated, and we stop.
+    if (!apiKeySelector || !newApiKeyInput || !btnAddKey || !btnDeleteKey) {
+        console.error("Could not find new API Key management elements in the HTML. Aborting settings initialization.");
+        return;
+    }
+    loadApiKeys();
+    loadOtherSettings();
+    setupEventListeners();
 }
 
-export function loadSettings() {
-    ApiKeyInput.value = localStorage.getItem("API_KEY") || "";
+function setupEventListeners() {
+    // API Key Listeners
+    btnAddKey.addEventListener("click", addApiKey);
+    btnDeleteKey.addEventListener("click", deleteActiveApiKey);
+    apiKeySelector.addEventListener("change", setActiveApiKey);
+
+    // Other Setting Listeners
+    maxTokensInput.addEventListener("input", saveOtherSettings);
+    temperatureInput.addEventListener("input", saveOtherSettings);
+    modelSelect.addEventListener("change", saveOtherSettings);
+    autoscrollToggle.addEventListener("change", saveOtherSettings);
+}
+
+// --- API Key Management Functions ---
+
+function loadApiKeys() {
+    const storedKeys = localStorage.getItem("API_KEYS");
+    apiKeys = storedKeys ? JSON.parse(storedKeys) : [];
+
+    const storedIndex = localStorage.getItem("ACTIVE_API_KEY_INDEX");
+    activeApiKeyIndex = storedIndex ? parseInt(storedIndex, 10) : 0;
+    
+    // Ensure the index is valid
+    if (activeApiKeyIndex >= apiKeys.length) {
+        activeApiKeyIndex = 0;
+    }
+
+    renderApiKeysDropdown();
+}
+
+function saveApiKeys() {
+    localStorage.setItem("API_KEYS", JSON.stringify(apiKeys));
+    localStorage.setItem("ACTIVE_API_KEY_INDEX", activeApiKeyIndex);
+}
+
+function renderApiKeysDropdown() {
+    apiKeySelector.innerHTML = ''; // Clear previous options
+
+    if (apiKeys.length === 0) {
+        const option = document.createElement('option');
+        option.textContent = "No API keys added";
+        option.disabled = true;
+        apiKeySelector.appendChild(option);
+        btnDeleteKey.style.display = 'none'; // Hide delete button if no keys
+        return;
+    }
+
+    btnDeleteKey.style.display = ''; // Show delete button if there are keys
+
+    apiKeys.forEach((key, index) => {
+        const option = document.createElement('option');
+        // Mask the key for display: "Key 1 (AIza...wE1s)"
+        const maskedKey = `Key ${index + 1} (${key.substring(0, 4)}...${key.substring(key.length - 4)})`;
+        option.textContent = maskedKey;
+        option.value = index;
+        apiKeySelector.appendChild(option);
+    });
+
+    apiKeySelector.value = activeApiKeyIndex;
+}
+
+function addApiKey() {
+    const newKey = newApiKeyInput.value.trim();
+    if (newKey) {
+        if (apiKeys.includes(newKey)) {
+            alert("This API key has already been added.");
+            return;
+        }
+        apiKeys.push(newKey);
+        // If this is the first key being added, make it active.
+        if (apiKeys.length === 1) {
+            activeApiKeyIndex = 0;
+        }
+        newApiKeyInput.value = ''; // Clear the input field
+        saveApiKeys();
+        renderApiKeysDropdown();
+    } else {
+        alert("Please paste an API key before adding.");
+    }
+}
+
+function deleteActiveApiKey() {
+    if (apiKeys.length === 0) return;
+
+    const selectedIndex = parseInt(apiKeySelector.value, 10);
+
+    if (confirm(`Are you sure you want to delete ${apiKeySelector.options[selectedIndex].text}?`)) {
+        apiKeys.splice(selectedIndex, 1);
+
+        // Adjust the active index if the deleted key was the active one or before it
+        if (activeApiKeyIndex >= selectedIndex && activeApiKeyIndex > 0) {
+             activeApiKeyIndex = Math.max(0, apiKeys.length - 1);
+        }
+
+        saveApiKeys();
+        renderApiKeysDropdown();
+    }
+}
+
+function setActiveApiKey() {
+    activeApiKeyIndex = parseInt(apiKeySelector.value, 10);
+    saveApiKeys();
+}
+
+// --- Other Settings Management ---
+
+function loadOtherSettings() {
     maxTokensInput.value = localStorage.getItem("maxTokens") || 1000;
     temperatureInput.value = localStorage.getItem("TEMPERATURE") || 70;
-    // UPDATED: Default model now matches the HTML default for consistency
     modelSelect.value = localStorage.getItem("model") || "gemini-2.5-flash-preview-04-17";
     autoscrollToggle.checked = localStorage.getItem("autoscroll") === "true";
 }
 
-export function saveSettings() {
-    localStorage.setItem("API_KEY", ApiKeyInput.value);
+function saveOtherSettings() {
     localStorage.setItem("maxTokens", maxTokensInput.value);
     localStorage.setItem("TEMPERATURE", temperatureInput.value);
     localStorage.setItem("model", modelSelect.value);
     localStorage.setItem("autoscroll", autoscrollToggle.checked);
 }
 
+// --- Public Functions ---
+
 export function getSettings() {
+    // Get the currently active API key
+    const activeKey = apiKeys.length > 0 ? apiKeys[activeApiKeyIndex] : null;
+
     return {
-        apiKey: ApiKeyInput.value,
+        apiKey: activeKey,
         maxTokens: maxTokensInput.value,
         temperature: temperatureInput.value,
         safetySettings: [
@@ -43,7 +166,7 @@ export function getSettings() {
             { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
             { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE }
         ],
-        model: modelSelect.value, // This correctly gets the live value from the dropdown
+        model: modelSelect.value,
         autoscroll: autoscrollToggle.checked,
     }
 }
