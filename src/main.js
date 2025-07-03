@@ -28,15 +28,62 @@ document.addEventListener('DOMContentLoaded', () => {
         container.classList.add('sidebar-hidden');
     }
 
-    /* 
-       ... ALL YOUR OTHER main.js CODE CAN GO HERE,
-       INSIDE THE DOMContentLoaded LISTENER ...
-    */
+    // --- Sidebar Resizing Logic ---
+    const sidebar = document.querySelector('.sidebar');
+    const resizer = document.querySelector('#sidebar-resizer');
 
+    const MIN_WIDTH = 280; // Minimum sidebar width in pixels
+    const DEFAULT_WIDTH = 480; // Default width in pixels (equivalent to 30rem)
+
+    // Function to set the sidebar width from localStorage or to default
+    const setInitialSidebarWidth = () => {
+        const savedWidth = localStorage.getItem('sidebarWidth');
+        if (savedWidth) {
+            sidebar.style.width = `${savedWidth}px`;
+        } else {
+            sidebar.style.width = `${DEFAULT_WIDTH}px`;
+        }
+    };
+
+    // Set the initial width when the page loads
+    setInitialSidebarWidth();
+
+    // This function runs when the mouse moves during a resize
+    const handleResize = (e) => {
+        // Get the sidebar's left edge position
+        const sidebarRect = sidebar.getBoundingClientRect();
+        // Calculate the new width
+        const newWidth = e.clientX - sidebarRect.left;
+        // Apply the new width, respecting the minimum width
+        sidebar.style.width = `${Math.max(MIN_WIDTH, newWidth)}px`;
+    };
+
+    // This function runs when the mouse button is released
+    const stopResize = () => {
+        // Remove the class from the body
+        document.body.classList.remove('is-resizing');
+
+        // Remove the event listeners from the window
+        window.removeEventListener('mousemove', handleResize);
+        window.removeEventListener('mouseup', stopResize);
+
+        // Save the final width to localStorage so it's remembered
+        localStorage.setItem('sidebarWidth', sidebar.offsetWidth);
+    };
+
+    // Add the starting event listener to the resizer element
+    resizer.addEventListener('mousedown', (e) => {
+        // Prevent default browser actions (like selecting text)
+        e.preventDefault();
+
+        // Add a class to the body to indicate resizing is active
+        document.body.classList.add('is-resizing');
+
+        // Attach listeners to the whole window to handle the drag
+        window.addEventListener('mousemove', handleResize);
+        window.addEventListener('mouseup', stopResize);
+    });
 });
-
-
-
 
 
 import * as personalityService from "./services/Personality.service";
@@ -114,5 +161,3 @@ window.addEventListener("resize", () => {
         }
     }
 });
-
-

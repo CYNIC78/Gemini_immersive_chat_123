@@ -515,7 +515,7 @@ form {
     flex-direction: column;
     gap: 0.5rem;
     padding: 1rem;
-    width: 30rem;
+    /* width: 30rem; */ /* This line has been removed to allow resizing */
     border-radius: 1rem;
     scrollbar-width: thin;
     height: calc(100dvh - 4rem);
@@ -1332,4 +1332,47 @@ input[name="currentChat"][value="none"] {
     font-family: 'Material Symbols Outlined';
     font-size: 1.1rem; /* You can adjust this size */
     font-weight: normal; /* Important for icons */
+}
+
+/* ===================================== */
+/* ===       SIDEBAR RESIZER         === */
+/* ===================================== */
+
+#sidebar-resizer {
+    flex-shrink: 0;
+    width: 5px;
+    cursor: col-resize;
+    background-color: transparent;
+    transition: background-color 0.2s ease;
+    /* Align with sidebar sticky behavior */
+    position: sticky;
+    top: 1rem;
+    height: calc(100dvh - 4rem);
+}
+
+/* On hover, give a visual indicator */
+#sidebar-resizer:hover {
+    background-color: #5f96c8; /* A color from your theme */
+}
+
+/* When dragging, keep the indicator visible and change cursor globally */
+body.is-resizing {
+    cursor: col-resize;
+    user-select: none; /* Prevent text selection during drag */
+}
+
+body.is-resizing #sidebar-resizer {
+    background-color: #5f96c8;
+}
+
+/* When the sidebar is hidden, the resizer should also be hidden */
+.container.sidebar-hidden #sidebar-resizer {
+    display: none;
+}
+
+/* Hide the resizer on mobile views */
+@media (max-width: 1032px) {
+    #sidebar-resizer {
+        display: none !important;
+    }
 }
