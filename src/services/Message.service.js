@@ -20,7 +20,6 @@ function buildContentHistory(chat, stoppingIndex = null) {
     return history;
 }
 
-// --- NEW: Function to generate the character's first message ---
 export async function generateFirstMessage(db) {
     const settings = settingsService.getSettings();
     const selectedPersonality = await personalityService.getSelected();
@@ -56,7 +55,7 @@ export async function generateFirstMessage(db) {
     const contents = [{ role: 'user', parts: [{ text: firstMessageUserContent }] }];
     const result = await model.generateContentStream({ contents });
     
-    const placeholder = await insertMessage({ role: 'model' }, 0, db, selectedPersonality); // Insert at index 0
+    const placeholder = await insertMessage({ role: 'model' }, 0, db, selectedPersonality);
     const reply = await streamResponse(placeholder, result.stream); 
 
     const modelMessage = {
@@ -227,40 +226,27 @@ export async function insertMessage(msgObj, index, db, personality = null) {
                 <div class="message-actions">
                     ${hasVersions ? `<div class="version-swiper"><button class="btn-version-prev btn-textual material-symbols-outlined">chevron_left</button><span>${activeVersion + 1}/${msgObj.versions.length}</span><button class="btn-version-next btn-textual material-symbols-outlined">chevron_right</button></div>` : ''}
                     <button class="btn-refresh btn-textual material-symbols-outlined" title="Regenerate response">refresh</button>
-                    <!-- BUG FIX: Add Edit button for Model Messages -->
                     <button class="btn-edit btn-textual material-symbols-outlined" title="Edit message">edit</button>
                     <button class="btn-delete btn-textual material-symbols-outlined" title="Delete message">delete</button>
                 </div>
             </div>
-            <div class="message-text">${marked.parse(versionText, { breaks: true })}</div>`;
+            <!-- UX IMPROVEMENT: Make model messages directly editable -->
+            <div class="message-text" contenteditable="true">${marked.parse(versionText, { breaks: true })}</div>`;
         hljs.highlightAll();
 
         newMessage.querySelector(".btn-refresh").addEventListener("click", () => regenerate(index, db));
         newMessage.querySelector(".btn-delete").addEventListener("click", () => deleteMessage(index, db));
         
-        // BUG FIX: Edit functionality for Model Messages
-        const editButton = newMessage.querySelector(".btn-edit");
+        // UX IMPROVEMENT: We no longer need the edit button listener, just the blur listener to save.
         const messageContentEl = newMessage.querySelector(".message-text");
         
-        editButton.addEventListener("click", () => {
-            messageContentEl.contentEditable = true; // Make the content editable
-            messageContentEl.focus(); // Focus on it so the user can type
-        });
-
-        // Save changes when user clicks away from the message
         messageContentEl.addEventListener("blur", async () => {
-            if (messageContentEl.contentEditable === "true") {
-                messageContentEl.contentEditable = false; // Turn off contenteditable
-                const currentChat = await chatsService.getCurrentChat(db);
-                // Update the active version's text with the new content
-                currentChat.content[index].versions[currentChat.content[index].activeVersion].text = messageContentEl.textContent;
-                await db.chats.put(currentChat); // Save to database
-                // Re-parse to update formatting (like markdown)
-                messageContentEl.innerHTML = marked.parse(messageContentEl.textContent, { breaks: true });
-                hljs.highlightAll(); // Re-highlight code blocks
-            }
+            const currentChat = await chatsService.getCurrentChat(db);
+            currentChat.content[index].versions[currentChat.content[index].activeVersion].text = messageContentEl.textContent;
+            await db.chats.put(currentChat);
+            messageContentEl.innerHTML = marked.parse(messageContentEl.textContent, { breaks: true });
+            hljs.highlightAll();
         });
-        // --- END BUG FIX ---
         
         if(hasVersions) {
             newMessage.querySelector(".btn-version-prev").addEventListener("click", () => switchVersion(index, -1, db));
@@ -271,27 +257,21 @@ export async function insertMessage(msgObj, index, db, personality = null) {
         newMessage.classList.add("message-user");
         newMessage.innerHTML = `
             <div class="message-header"><h3 class="message-role">You</h3><div class="message-actions">
-                <!-- BUG FIX: Add Edit button for User Messages -->
                 <button class="btn-edit btn-textual material-symbols-outlined" title="Edit message">edit</button>
                 <button class="btn-delete btn-textual material-symbols-outlined" title="Delete message">delete</button>
             </div></div>
-            <!-- BUG FIX: Make User message text contenteditable -->
             <div class="message-text" contenteditable="true">${marked.parse(msgObj.parts[0].text, { breaks: true })}</div>`;
         
         newMessage.querySelector(".btn-delete").addEventListener("click", () => deleteMessage(index, db));
         
-        // BUG FIX: Save changes for User Messages on blur
         const messageContentEl = newMessage.querySelector(".message-text");
         messageContentEl.addEventListener("blur", async () => {
             const currentChat = await chatsService.getCurrentChat(db);
-            // Update the user message's text
             currentChat.content[index].parts[0].text = messageContentEl.textContent;
-            await db.chats.put(currentChat); // Save to database
-            // Re-parse to update formatting (like markdown)
+            await db.chats.put(currentChat);
             messageContentEl.innerHTML = marked.parse(messageContentEl.textContent, { breaks: true });
-            hljs.highlightAll(); // Re-highlight code blocks
+            hljs.highlightAll();
         });
-        // --- END BUG FIX ---
     }
     return newMessage;
 }
