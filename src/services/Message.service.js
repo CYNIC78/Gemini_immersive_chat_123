@@ -31,7 +31,7 @@ export async function send(msg, db) {
     // Create a new chat if one doesn't exist
     if (!currentChat) {
         const titleModel = ai.getGenerativeModel({ model: settings.model });
-        const result = await titleModel.generateContent(`Generate a short, snappy title for a chat that starts with this message: "${msg}"`);
+        const result = await titleModel.generateContent(`You are a title generator. Your ONLY job is to create a short, concise title (4 words max) for a chat that starts with the following message. Do NOT add any extra text, conversation, or quotation marks. Just the title. Message: "${msg}"`);
         const title = result.response.text();
         const id = await chatsService.addChat(title, null, db);
         document.querySelector(`#chat${id}`).click();

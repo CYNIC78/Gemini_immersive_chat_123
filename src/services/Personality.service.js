@@ -51,7 +51,15 @@ export async function initialize() {
 }
 
 export async function getSelected() {
-    const selectedID = document.querySelector("input[name='personality']:checked").parentElement.id.split("-")[1];
+    const selectedRadio = document.querySelector("input[name='personality']:checked');
+    if (!selectedRadio) return getDefault(); // Failsafe
+
+    const parentLabel = selectedRadio.parentElement;
+    if (!parentLabel.id) { // This handles the default personality which might not have a DB ID
+        return getDefault();
+    }
+
+    const selectedID = parentLabel.id.split("-")[1];
     if (!selectedID) {
         return getDefault();
     }
@@ -74,8 +82,9 @@ export async function get(id) {
 export async function getByName(name, database = null) {
     if (!name) return null;
     
-    // Handle default personality
-    if (name.toLowerCase() === "zodiac") {
+    // --- THIS IS THE FIX ---
+    // Handle default personality by its actual name
+    if (name.toLowerCase() === "aphrodite") {
         return { ...getDefault(), id: -1 };
     }
 
@@ -91,11 +100,7 @@ export async function getByName(name, database = null) {
                 p.name.toLowerCase() === name.toLowerCase()
             );
         }
-
-        // Debug logging
-        console.log('Searching for personality:', name);
-        console.log('Found personality:', personality);
-
+        
         return personality || null;
     } catch (error) {
         console.error(`Error finding personality by name: ${name}`, error);
@@ -197,9 +202,9 @@ export async function edit(id, personality) {
 export function generateCard(personality) {
     const card = document.createElement("label");
     card.classList.add("card-personality");
-    if (personality.id) {
-        card.id = `personality-${personality.id}`;
-    }
+    // FIX: Also give the default Aphrodite card an ID so it can be found.
+    card.id = `personality-${personality.id || -1}`;
+
     card.innerHTML = `
             <img class="background-img" src="${personality.image}"></img>
             <input  type="radio" name="personality" value="${personality.name}">
@@ -245,4 +250,3 @@ export function generateCard(personality) {
     }
     return card;
 }
-
