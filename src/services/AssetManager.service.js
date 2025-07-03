@@ -5,7 +5,6 @@
  */
 
 // This will hold the character's assets while we are editing them.
-// It's like a temporary notepad.
 let currentAssets = [];
 let currentGroups = ['All Assets'];
 let activeGroupName = 'All Assets';
@@ -20,28 +19,19 @@ const currentGroupHeader = document.querySelector('#current-group-header');
 
 /**
  * Initializes the Asset Manager for a specific character's assets.
- * This is called when the user opens the "Add/Edit Personality" form.
  * @param {Array} personalityAssets - The array of assets from the personality object.
  */
 export function initialize(personalityAssets = []) {
-    // We make a deep copy to avoid changing the original data until we save.
-    currentAssets = JSON.parse(JSON.stringify(personalityAssets));
-    
-    // Reset state from any previous edits
+    currentAssets = JSON.parse(JSON.stringify(personalityAssets || []));
     activeGroupName = 'All Assets';
-    
-    // Figure out all the unique group names from the assets
     const uniqueGroups = new Set(currentAssets.map(asset => asset.group));
     currentGroups = ['All Assets', ...uniqueGroups];
-    
-    // Render the UI
     renderGroups();
     renderGallery();
 }
 
 /**
  * Returns the current state of the assets array.
- * This is called when the user clicks "Submit" on the form.
  * @returns {Array} - The current, possibly modified, assets array.
  */
 export function getAssets() {
@@ -52,7 +42,7 @@ export function getAssets() {
  * Renders the list of groups in the left panel.
  */
 function renderGroups() {
-    groupsListEl.innerHTML = ''; // Clear the list first
+    groupsListEl.innerHTML = '';
     currentGroups.forEach(groupName => {
         const groupEl = document.createElement('div');
         groupEl.classList.add('group-item');
@@ -60,15 +50,12 @@ function renderGroups() {
         if (groupName === activeGroupName) {
             groupEl.classList.add('active');
         }
-        
-        // Add click event to switch the active group
         groupEl.addEventListener('click', () => {
             activeGroupName = groupName;
-            currentGroupHeader.textContent = groupName; // Update header
-            renderGroups(); // Re-render to show the new active group
-            renderGallery(); // Re-render the gallery for the selected group
+            currentGroupHeader.textContent = groupName;
+            renderGroups();
+            renderGallery();
         });
-        
         groupsListEl.appendChild(groupEl);
     });
 }
@@ -77,9 +64,7 @@ function renderGroups() {
  * Renders the grid of asset cards in the main gallery view.
  */
 function renderGallery() {
-    galleryGridEl.innerHTML = ''; // Clear the gallery first
-    
-    // Filter assets to show only those in the active group
+    galleryGridEl.innerHTML = '';
     const assetsToShow = activeGroupName === 'All Assets'
         ? currentAssets
         : currentAssets.filter(asset => asset.group === activeGroupName);
@@ -87,9 +72,42 @@ function renderGallery() {
     if (assetsToShow.length === 0) {
         galleryGridEl.innerHTML = `<p style="opacity: 0.6;">No assets in this group. Try uploading some!</p>`;
     } else {
-       // We will add the code to render asset cards here in a future step.
+       assetsToShow.forEach(asset => {
+            const card = createAssetCard(asset);
+            galleryGridEl.appendChild(card);
+       });
     }
 }
+
+/**
+ * Creates an HTML element for a single asset card.
+ * @param {object} asset - The asset object to render.
+ * @returns {HTMLElement} - The asset card element.
+ */
+function createAssetCard(asset) {
+    const card = document.createElement('div');
+    card.classList.add('asset-card');
+    card.innerHTML = `
+        <img src="${asset.base64Data}" class="asset-thumbnail" alt="${asset.filename}">
+        <div class="asset-info">
+            <p class="asset-filename">${asset.filename}</p>
+            <input type="text" class="asset-tags-input input-field" placeholder="Add tags..." value="${asset.tags.join(', ')}">
+        </div>
+        <button class="btn-delete-asset material-symbols-outlined" title="Delete Asset">delete</button>
+    `;
+
+    // --- Event Listeners for the card ---
+    const tagsInput = card.querySelector('.asset-tags-input');
+    tagsInput.addEventListener('change', () => {
+        // Update the tags in our temporary array when the input changes
+        asset.tags = tagsInput.value.split(',').map(tag => tag.trim()).filter(Boolean);
+    });
+    
+    // We will add the delete button functionality later.
+
+    return card;
+}
+
 
 /**
  * Handles adding a new group.
@@ -98,18 +116,60 @@ function addGroup() {
     const newName = newGroupNameInput.value.trim();
     if (newName && !currentGroups.includes(newName)) {
         currentGroups.push(newName);
-        newGroupNameInput.value = ''; // Clear the input
-        renderGroups(); // Update the UI with the new group
+        newGroupNameInput.value = '';
+        renderGroups();
     }
+}
+
+/**
+ * Handles the file upload process.
+ */
+function handleUpload() {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    // For now, we only accept images. We'll add audio later.
+    fileInput.accept = 'image/png, image/jpeg, image/gif';
+    fileInput.multiple = true; // Allow selecting multiple files
+
+    fileInput.addEventListener('change', () => {
+        // A "real" array from the FileList
+        const files = Array.from(fileInput.files);
+        
+        files.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const base64Data = e.target.result;
+                const newAsset = {
+                    id: `asset-${Date.now()}-${Math.random()}`, // Unique ID
+                    filename: file.name,
+                    type: 'image', // Hardcoded for now
+                    group: activeGroupName === 'All Assets' ? 'Unsorted' : activeGroupName,
+                    tags: [],
+                    base64Data: base64Data
+                };
+
+                // If uploading to "All Assets", and "Unsorted" group doesn't exist, create it.
+                if (newAsset.group === 'Unsorted' && !currentGroups.includes('Unsorted')) {
+                    currentGroups.push('Unsorted');
+                    renderGroups();
+                }
+
+                currentAssets.push(newAsset);
+                renderGallery(); // Re-render the gallery to show the new asset
+            };
+            reader.readAsDataURL(file); // This triggers the 'onload' event
+        });
+    });
+
+    fileInput.click(); // Open the file selection dialog
 }
 
 // Attach event listeners to the buttons
 addGroupBtn.addEventListener('click', addGroup);
-
-// Also add group when user presses Enter
 newGroupNameInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
-        e.preventDefault(); // prevent form submission
+        e.preventDefault();
         addGroup();
     }
 });
+uploadBtn.addEventListener('click', handleUpload);
