@@ -9,7 +9,7 @@ const maxTokensInput = document.querySelector("#maxTokens");
 const temperatureInput = document.querySelector("#temperature");
 const modelSelect = document.querySelector("#selectedModel");
 const autoscrollToggle = document.querySelector("#autoscroll");
-const typingSpeedInput = document.querySelector("#typingSpeed"); // NEW
+const typingSpeedInput = document.querySelector("#typingSpeed");
 const colorPrimaryBgInput = document.querySelector("#colorPrimaryBg");
 const colorSecondaryBgInput = document.querySelector("#colorSecondaryBg");
 const colorTertiaryBgInput = document.querySelector("#colorTertiaryBg");
@@ -38,7 +38,7 @@ function setupEventListeners() {
     if (temperatureInput) temperatureInput.addEventListener("input", saveOtherSettings);
     if (modelSelect) modelSelect.addEventListener("change", saveOtherSettings);
     if (autoscrollToggle) autoscrollToggle.addEventListener("change", saveOtherSettings);
-    if (typingSpeedInput) typingSpeedInput.addEventListener("input", saveOtherSettings); // NEW
+    if (typingSpeedInput) typingSpeedInput.addEventListener("input", saveOtherSettings);
 }
 
 // --- API Key Management ---
@@ -115,14 +115,14 @@ function loadOtherSettings() {
     temperatureInput.value = localStorage.getItem("TEMPERATURE") || 70;
     modelSelect.value = localStorage.getItem("model") || "gemini-2.5-flash-preview-04-17";
     autoscrollToggle.checked = localStorage.getItem("autoscroll") === "true";
-    typingSpeedInput.value = localStorage.getItem("typingSpeed") || 50; // NEW
+    typingSpeedInput.value = localStorage.getItem("typingSpeed") || 100; // CORRECTED DEFAULT
 }
 function saveOtherSettings() {
     localStorage.setItem("maxTokens", maxTokensInput.value);
     localStorage.setItem("TEMPERATURE", temperatureInput.value);
     localStorage.setItem("model", modelSelect.value);
     localStorage.setItem("autoscroll", autoscrollToggle.checked);
-    localStorage.setItem("typingSpeed", typingSpeedInput.value); // NEW
+    localStorage.setItem("typingSpeed", typingSpeedInput.value);
 }
 
 // --- Color Scheme ---
@@ -211,7 +211,7 @@ export function getSettings() {
         ],
         model: modelSelect.value,
         autoscroll: autoscrollToggle.checked,
-        typingSpeed: typingSpeedInput.value, // NEW
+        typingSpeed: typingSpeedInput.value,
     }
 }
 export function getSystemPrompt() {
