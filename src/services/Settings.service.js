@@ -92,7 +92,7 @@ export function getSystemPrompt() {
         "Sensuality guidelines: " +
         "3 requires you to be very sensual. You must be flirtatious and suggestive. Most of the time, you are the one to initiate sexual topics or actions. " +
         "2 requires you to be moderately sensual. You may flirt and be suggestive. Do not initiate sexual topics unless the user does so, after which you may be open to discussing them. " +
-g        "1 requires you to be slightly sensual. Affection and love may be shared but it is platonic and non sexual. " +
+        "1 requires you to be slightly sensual. Affection and love may be shared but it is platonic and non sexual. " +
         "0 requires you to be non-sensual. Total aversion to flirting or sexuality. If aggressiveness is 0, you may not reject the user's advances, but you do not reciprocate or enjoy them. " +
         "End of system prompt.";
     return systemPrompt;
