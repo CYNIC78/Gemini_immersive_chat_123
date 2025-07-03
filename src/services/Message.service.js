@@ -6,37 +6,80 @@ import * as chatsService from "./Chats.service.js";
 import * as helpers from "../utils/helpers.js";
 import * as characterScriptService from "./CharacterScript.service.js";
 
-
-// THIS FUNCTION IS NOW SMARTER! It streams text to the screen AND returns the full text.
-async function streamResponseToElement(messageElement, netStream) {
-    const messageContent = messageElement.querySelector(".message-text");
+// --- NEW Core Streaming Function ---
+/**
+ * Creates a message placeholder and streams the AI response into it,
+ * then runs the character script on the final text.
+ * @param {ReadableStream} netStream - The stream from the Gemini API.
+ * @param {object} selectedPersonality - The current character object.
+ * @param {string} userMessageText - The text of the user's message.
+ * @returns {Promise<object>} - A promise that resolves with the final model message object.
+ */
+async function streamAndProcessResponse(netStream, selectedPersonality, userMessageText) {
+    // 1. Create a placeholder message element with the default avatar.
+    const placeholder = await insertMessage({ role: 'model', versions: [{text:''}] }, -1, null, selectedPersonality);
+    const textElement = placeholder.querySelector('.message-text');
     let rawText = "";
+
+    // 2. Stream the response into the placeholder for the typing effect.
     try {
         for await (const chunk of netStream) {
-            const chunkText = chunk.text();
-            rawText += chunkText;
-            // This is the magic line that creates the typing effect!
-            messageContent.innerHTML = marked.parse(rawText, { breaks: true });
+            rawText += chunk.text();
+            textElement.innerHTML = marked.parse(rawText, { breaks: true });
             helpers.messageContainerScrollToBottom();
         }
-        hljs.highlightAll();
-        return rawText;
     } catch (error) {
-        messageContent.innerHTML += `<br><br><strong style='color:red;'>Error during stream. Check console (F12).</strong>`;
         console.error("Stream error:", error);
-        return rawText;
+        textElement.innerHTML += `<br><br><strong style='color:red;'>Error during stream. Check console (F12).</strong>`;
     }
+    hljs.highlightAll();
+
+    // 3. Now that we have the full text, run the custom script.
+    let modifiedText = rawText;
+    let finalImage = personalityService.findDefaultAvatar(selectedPersonality);
+
+    if (selectedPersonality.customScript && selectedPersonality.customScript.trim() !== "") {
+        const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, userMessageText);
+        modifiedText = scriptResult.modelResponse;
+        
+        if (scriptResult.character && scriptResult.character.image) {
+            finalImage = scriptResult.character.image;
+
+            // Update the sidebar card for the latest message
+            const characterCard = document.querySelector(`#personality-${selectedPersonality.id}`);
+            if (characterCard) {
+                const cardImage = characterCard.querySelector('.background-img');
+                if (cardImage) cardImage.src = finalImage;
+            }
+        }
+    }
+
+    // 4. Update the placeholder's avatar and final text.
+    placeholder.querySelector('.pfp').src = finalImage;
+    textElement.innerHTML = marked.parse(modifiedText, { breaks: true }); // Ensure final text is correct
+    hljs.highlightAll();
+
+
+    // 5. Return the final data to be saved.
+    return {
+        role: "model",
+        personality: selectedPersonality.name,
+        personalityid: selectedPersonality.id,
+        versions: [{ text: modifiedText }],
+        activeVersion: 0,
+    };
 }
 
+
+// --- Main Functions (Simplified to use the new core function) ---
 
 function buildContentHistory(chat, stoppingIndex = null) {
     const contentToProcess = stoppingIndex ? chat.content.slice(0, stoppingIndex) : chat.content;
     const history = [];
-    
     for (const msg of contentToProcess) {
-         if (msg.role === "model") {
+        if (msg.role === "model") {
             const text = msg.versions[msg.activeVersion].text;
-            history.push({ role: "model", parts: [{ text: text }] });
+            history.push({ role: "model", parts: [{ text }] });
         } else {
             history.push({ role: "user", parts: [{ text: msg.parts[0].text }] });
         }
@@ -44,142 +87,45 @@ function buildContentHistory(chat, stoppingIndex = null) {
     return history;
 }
 
-export async function generateFirstMessage(db) {
-    const settings = settingsService.getSettings();
-    const selectedPersonality = await personalityService.getSelected();
-    let currentChat = await chatsService.getCurrentChat(db);
-
-    if (!selectedPersonality || !settings.apiKey || !currentChat || !selectedPersonality.firstMessagePrompt) {
-        return;
-    }
-
-    let firstMessageUserContent = selectedPersonality.firstMessagePrompt;
-    if (selectedPersonality.scenario && selectedPersonality.scenario.trim() !== "") {
-        firstMessageUserContent = `Scenario: ${selectedPersonality.scenario}\n\nInstructions: ${firstMessageUserContent}`;
-    }
-
-    const ai = new GoogleGenerativeAI(settings.apiKey);
-    const mainSystemPrompt = settingsService.getSystemPrompt();
-    const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
-    const fullSystemInstruction = mainSystemPrompt + "\n\n" + characterPrompt;
-    
-    const model = ai.getGenerativeModel({ model: settings.model, systemInstruction: fullSystemInstruction });
-    const contents = [{ role: 'user', parts: [{ text: firstMessageUserContent }] }];
-    
-    // Create the placeholder message bubble first
-    const placeholder = await insertMessage({ role: 'model' }, currentChat.content.length, db, selectedPersonality);
-    
-    // Stream the response directly into the placeholder
-    const result = await model.generateContentStream({ contents });
-    const rawText = await streamResponseToElement(placeholder, result.stream);
-
-    let modifiedText = rawText;
-    let displayPersonality = { ...selectedPersonality, image: personalityService.findDefaultAvatar(selectedPersonality) };
-
-    if (selectedPersonality.customScript && selectedPersonality.customScript.trim() !== "") {
-        const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, firstMessageUserContent);
-        modifiedText = scriptResult.modelResponse;
-        const finalImage = scriptResult.character.image || personalityService.findDefaultAvatar(selectedPersonality);
-        displayPersonality = { ...selectedPersonality, image: finalImage };
-
-        if (scriptResult.character && scriptResult.character.image) {
-            const characterCard = document.querySelector(`#personality-${selectedPersonality.id}`);
-            if (characterCard) {
-                const cardImage = characterCard.querySelector('.background-img');
-                if (cardImage) cardImage.src = scriptResult.character.image;
-            }
-        }
-    }
-
-    const modelMessage = {
-        role: "model",
-        personality: selectedPersonality.name,
-        personalityid: selectedPersonality.id,
-        versions: [{ text: modifiedText }],
-        activeVersion: 0
-    };
-
-    currentChat.content.push(modelMessage);
-    await db.chats.put(currentChat);
-    
-    // Final update of the message bubble with script-modified data
-    await chatsService.loadChat(currentChat.id, db);
-}
-
 export async function send(msg, db) {
     const settings = settingsService.getSettings();
     const selectedPersonality = await personalityService.getSelected();
     if (!selectedPersonality || !settings.apiKey || !msg) return;
 
-    const ai = new GoogleGenerativeAI(settings.apiKey);
-    
     let currentChat = await chatsService.getCurrentChat(db);
     if (!currentChat) {
+        const ai = new GoogleGenerativeAI(settings.apiKey);
         const titleModel = ai.getGenerativeModel({ model: settings.model });
-        const titleResult = await titleModel.generateContent(`You are a title generator. Your ONLY job is to create a short, concise title (6 words max) for a chat that starts with the following message. Do NOT add any extra text, conversation, greetings, or quotation marks. ONLY reply with the title itself. Message: "${msg}"`);
-        const title = titleResult.response.text();
-        const id = await chatsService.addChat(title, null, db);
+        const titleResult = await titleModel.generateContent(`Create a short, concise title (6 words max) for a chat that starts with this message. Do NOT add extra text or quotes. Message: "${msg}"`);
+        const id = await chatsService.addChat(titleResult.response.text(), null, db);
         document.querySelector(`#chat${id}`).click();
         currentChat = await chatsService.getCurrentChat(db);
     }
     
-    let apiMsg = msg;
-    if (selectedPersonality.reminder && selectedPersonality.reminder.trim() !== "") {
-        apiMsg = `${msg}\n\n${selectedPersonality.reminder}`;
-    }
-
-    const history = buildContentHistory(currentChat);
-    const contents = [...history, { role: 'user', parts: [{ text: apiMsg }] }];
-
     const userMessage = { role: "user", parts: [{ text: msg }] };
     currentChat.content.push(userMessage);
     await insertMessage(userMessage, currentChat.content.length - 1, db);
     helpers.messageContainerScrollToBottom();
 
+    let apiMsg = selectedPersonality.reminder ? `${msg}\n\n${selectedPersonality.reminder}` : msg;
+    const history = buildContentHistory(currentChat);
+    const contents = [...history, { role: 'user', parts: [{ text: apiMsg }] }];
+    
+    const ai = new GoogleGenerativeAI(settings.apiKey);
     const mainSystemPrompt = settingsService.getSystemPrompt();
     const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
-    const fullSystemInstruction = mainSystemPrompt + "\n\n" + characterPrompt;
-    
-    const model = ai.getGenerativeModel({ model: settings.model, systemInstruction: fullSystemInstruction });
-    
-    // Create placeholder and stream into it
-    const placeholder = await insertMessage({ role: 'model' }, currentChat.content.length, db, selectedPersonality);
+    const model = ai.getGenerativeModel({ model: settings.model, systemInstruction: mainSystemPrompt + "\n\n" + characterPrompt });
     const result = await model.generateContentStream({ contents });
-    const rawText = await streamResponseToElement(placeholder, result.stream);
 
-    let modifiedText = rawText;
-    let displayPersonality = { ...selectedPersonality, image: personalityService.findDefaultAvatar(selectedPersonality) };
-
-    if (selectedPersonality.customScript && selectedPersonality.customScript.trim() !== "") {
-        const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, msg);
-        modifiedText = scriptResult.modelResponse;
-        const finalImage = scriptResult.character.image || personalityService.findDefaultAvatar(selectedPersonality);
-        displayPersonality = { ...selectedPersonality, image: finalImage };
-        
-        if (scriptResult.character && scriptResult.character.image) {
-            const characterCard = document.querySelector(`#personality-${selectedPersonality.id}`);
-            if (characterCard) {
-                const cardImage = characterCard.querySelector('.background-img');
-                if (cardImage) cardImage.src = scriptResult.character.image;
-            }
-        }
-    }
-
-    const modelMessage = {
-        role: "model",
-        personality: selectedPersonality.name,
-        personalityid: selectedPersonality.id,
-        versions: [{ text: modifiedText }],
-        activeVersion: 0
-    };
-
+    const modelMessage = await streamAndProcessResponse(result.stream, selectedPersonality, msg);
+    
     currentChat.content.push(modelMessage);
     await db.chats.put(currentChat);
-    
-    // Final update after script runs
+    // Reload chat to update indexes and swipers correctly
     await chatsService.loadChat(currentChat.id, db);
 }
 
+// NOTE: Regeneration does not support streaming to keep the logic simple and robust.
 async function regenerate(messageIndex, db) {
     const settings = settingsService.getSettings();
     const selectedPersonality = await personalityService.getSelected();
@@ -188,44 +134,36 @@ async function regenerate(messageIndex, db) {
     let userMessageText = "";
 
     const messageElement = document.querySelector(`.message[data-index="${messageIndex}"]`);
-    
+    messageElement.querySelector('.message-text').innerHTML = "<i>Regenerating...</i>";
+
     if (messageIndex === 0) {
-        let firstMessageUserContent = selectedPersonality.firstMessagePrompt;
-        if (selectedPersonality.scenario && selectedPersonality.scenario.trim() !== "") {
-            firstMessageUserContent = `Scenario: ${selectedPersonality.scenario}\n\nInstructions: ${firstMessageUserContent}`;
-        }
+        let firstMessageUserContent = selectedPersonality.firstMessagePrompt || "";
         contents = [{ role: 'user', parts: [{ text: firstMessageUserContent }] }];
         userMessageText = firstMessageUserContent;
     } else {
         const originalUserMsgText = currentChat.content[messageIndex - 1].parts[0].text;
         userMessageText = originalUserMsgText;
-        let apiMsg = originalUserMsgText;
-        if (selectedPersonality.reminder && selectedPersonality.reminder.trim() !== "") {
-            apiMsg = `${originalUserMsgText}\n\n${selectedPersonality.reminder}`;
-        }
-        const history = buildContentHistory(currentChat, messageIndex - 1);
-        contents = [...history, { role: 'user', parts: [{ text: apiMsg }] }];
+        const history = buildContentHistory(currentChat, messageIndex);
+        contents = history;
     }
     
+    const ai = new GoogleGenerativeAI(settings.apiKey);
     const mainSystemPrompt = settingsService.getSystemPrompt();
     const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
-    const fullSystemInstruction = mainSystemPrompt + "\n\n" + characterPrompt;
+    const model = ai.getGenerativeModel({ model: settings.model, systemInstruction: mainSystemPrompt + "\n\n" + characterPrompt });
 
-    const ai = new GoogleGenerativeAI(settings.apiKey);
-    const model = ai.getGenerativeModel({ model: settings.model, systemInstruction: fullSystemInstruction });
-
-    // Stream directly into the existing message element
     const result = await model.generateContentStream({ contents });
-    const rawText = await streamResponseToElement(messageElement, result.stream);
+    const rawText = await streamResponseToText(result.stream);
     
     let modifiedText = rawText;
+    let finalImage = personalityService.findDefaultAvatar(selectedPersonality);
     
     if (selectedPersonality.customScript && selectedPersonality.customScript.trim() !== "") {
         const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, userMessageText);
         modifiedText = scriptResult.modelResponse;
         
         if (scriptResult.character && scriptResult.character.image) {
-            const finalImage = scriptResult.character.image;
+            finalImage = scriptResult.character.image;
             const isLastMessage = messageIndex === currentChat.content.length - 1;
             if (isLastMessage) {
                 const characterCard = document.querySelector(`#personality-${selectedPersonality.id}`);
@@ -234,9 +172,6 @@ async function regenerate(messageIndex, db) {
                     if (cardImage) cardImage.src = finalImage;
                 }
             }
-            // Update the message bubble's avatar directly
-            const pfpElement = messageElement.querySelector('.pfp');
-            pfpElement.src = finalImage;
         }
     }
 
@@ -244,19 +179,11 @@ async function regenerate(messageIndex, db) {
     modelMessage.versions.push({ text: modifiedText });
     modelMessage.activeVersion = modelMessage.versions.length - 1;
     await db.chats.put(currentChat);
-
-    // Final update of the text and swiper
-    await chatsService.loadChat(currentChat.id, db);
+    await chatsService.loadChat(currentChat.id, db); // Reload to ensure UI is perfectly in sync
 }
 
-// ... the rest of the file remains the same ...
 
-async function regenerateUserMessage(userMessageIndex, db) {
-    // This logic can also be improved, but let's focus on the main regenerate first.
-    // For now, reloading the chat is the safest way to handle this complex case.
-    await chatsService.loadChat(chatsService.getCurrentChatId(), db);
-    // The rest of this function will now use the reloaded data, ensuring consistency.
-}
+// --- The rest of the file remains largely the same ---
 
 export async function insertMessage(msgObj, index, db, personality = null) {
     const newMessage = document.createElement("div");
@@ -326,6 +253,11 @@ export async function insertMessage(msgObj, index, db, personality = null) {
         });
     }
     return newMessage;
+}
+
+async function regenerateUserMessage(userMessageIndex, db) {
+    // For now, we will just reload the chat to ensure stability on this complex action
+    await chatsService.loadChat(chatsService.getCurrentChatId(), db);
 }
 
 async function switchVersion(messageIndex, direction, db) {
