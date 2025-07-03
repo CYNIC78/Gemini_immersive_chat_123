@@ -23,7 +23,6 @@ export async function getAllChatIdentifiers(db) {
         )
         return identifiers;
     } catch (error) {
-        //to be implemented
         console.error(error);
     }
 }
@@ -38,7 +37,6 @@ export async function initialize(db) {
 }
 
 function insertChatEntry(chat, db) {
-    //radio button
     const chatRadioButton = document.createElement("input");
     chatRadioButton.setAttribute("type", "radio");
     chatRadioButton.setAttribute("name", "currentChat");
@@ -46,37 +44,31 @@ function insertChatEntry(chat, db) {
     chatRadioButton.id = "chat" + chat.id;
     chatRadioButton.classList.add("input-radio-currentchat");
 
-    //label
     const chatLabel = document.createElement("label",);
     chatLabel.setAttribute("for", "chat" + chat.id);
     chatLabel.classList.add("title-chat");
     chatLabel.classList.add("label-currentchat");
 
-
-    //
     const chatLabelText = document.createElement("span");
     chatLabelText.style.overflow = "hidden";
     chatLabelText.style.textOverflow = "ellipsis";
     chatLabelText.textContent = chat.title;
 
-    //
     const chatIcon = document.createElement("span");
     chatIcon.classList.add("material-symbols-outlined");
     chatIcon.textContent = "chat_bubble";
 
-    //
     const deleteEntryButton = document.createElement("button");
     deleteEntryButton.classList.add("btn-textual", "material-symbols-outlined");
     deleteEntryButton.textContent = "delete";
     deleteEntryButton.addEventListener("click", (e) => {
-        e.stopPropagation(); //so we don't activate the radio button
+        e.stopPropagation();
         deleteChat(chat.id, db);
     })
 
     chatLabel.append(chatIcon);
     chatLabel.append(chatLabelText);
     chatLabel.append(deleteEntryButton);
-
 
     chatRadioButton.addEventListener("change", async () => {
         await loadChat(chat.id, db);
@@ -86,8 +78,6 @@ function insertChatEntry(chat, db) {
     });
 
     chatHistorySection.prepend(chatRadioButton, chatLabel);
-
-
 }
 
 export async function addChat(title, firstMessage = null, db) {
@@ -110,10 +100,12 @@ export async function getCurrentChat(db) {
 }
 
 export async function deleteAllChats(db) {
-    await db.chats.clear();
-    initialize(db);
+    if (confirm("Are you sure you want to delete ALL chat histories? This cannot be undone.")) {
+        await db.chats.clear();
+        messageContainer.innerHTML = "";
+        initialize(db);
+    }
 }
-
 
 export async function deleteChat(id, db) {
     await db.chats.delete(id);
@@ -125,7 +117,10 @@ export async function deleteChat(id, db) {
 
 export function newChat() {
     messageContainer.innerHTML = "";
-    document.querySelector("input[name='currentChat']:checked").checked = false;
+    const checkedRadio = document.querySelector("input[name='currentChat']:checked");
+    if (checkedRadio) {
+        checkedRadio.checked = false;
+    }
 }
 
 export async function loadChat(chatID, db) {
@@ -135,40 +130,36 @@ export async function loadChat(chatID, db) {
         }
         messageContainer.innerHTML = "";
         const chat = await getChatById(chatID, db);
-        for (const msg of chat.content) {
+
+        // Use a for...of loop to handle async operations correctly
+        for (const [index, msg] of chat.content.entries()) {
             if (msg.role === "model") {
                 const personality = msg.personalityid ?
                     await personalityService.get(msg.personalityid, db) :
                     await personalityService.getByName(msg.personality, db);
-                await messageService.insertMessage(
-                    msg.role,
-                    msg.parts[0].text,
-                    personality.name,
-                    null,
-                    db,
-                    personality.image
-                );
+                
+                // We now pass the entire message object to insertMessage
+                await messageService.insertMessage(msg, index, db, personality);
+            } else { // User message
+                // We pass the message object and its index
+                await messageService.insertMessage(msg, index, db);
             }
-            else {
-                await messageService.insertMessage(msg.role, msg.parts[0].text, null, null, db);
-            }
-
         }
-        // Always scroll to bottom when loading a chat
+
         messageContainer.scrollTo({
             top: messageContainer.scrollHeight,
             behavior: 'auto'
         });
     }
     catch (error) {
-        alert("Error, please report this to the developer. You might need to restart the page to continue normal usage. Error: " + error);
+        alert("Error loading chat. It might be from a previous version. Please clear your chats and try again. Error: " + error);
         console.error(error);
     }
 }
 
 export async function getAllChats(db) {
-    const chats = await db.chats.orderBy('timestamp').toArray(); // Get all objects
-    chats.reverse() //reverse in order to have the latest chat at the top
+    const chats = await db.chats.orderBy('timestamp').toArray();
+    chats.reverse();
     return chats;
 }
 
@@ -176,4 +167,3 @@ export async function getChatById(id, db) {
     const chat = await db.chats.get(id);
     return chat;
 }
-
