@@ -22,22 +22,22 @@ export async function send(msg, db) {
     }
     //model setup
     const ai = new GoogleGenerativeAI(settings.apiKey);
-    const config = {
+    
+    // FIXED: generationConfig no longer contains safetySettings.
+    const generationConfig = {
         maxOutputTokens: parseInt(settings.maxTokens),
         temperature: settings.temperature / 100,
-        safetySettings: settings.safetySettings,
     };
     
     //user msg handling
     //we create a new chat if there is none is currently selected
     if (!await chatsService.getCurrentChat(db)) { 
-        // Use the generative model for chat title generation
-        const model = ai.getGenerativeModel({ 
-            model: settings.model, // Use the model from settings
-            systemInstruction: "You are to act as a generator for chat titles. The user will send a query - you must generate a title for the chat based on it. Only reply with the short title, nothing else. The user's message is: " + msg,
-        });
-        const response = await model.generateContent(""); // The user message is in the system prompt now
-        const title = response.response.text();
+        // A simpler, more robust way to generate the title
+        const titleModel = ai.getGenerativeModel({ model: settings.model });
+        const result = await titleModel.generateContent(
+            "You are to act as a generator for chat titles. The user will send a query - you must generate a title for the chat based on it. Only reply with the short title, nothing else. The user's message is: " + msg
+        );
+        const title = result.response.text();
         const id = await chatsService.addChat(title, null, db);
         document.querySelector(`#chat${id}`).click();
     }
@@ -83,7 +83,9 @@ export async function send(msg, db) {
     // Create chat session
     const chat = generativeModel.startChat({
         history: history,
-        generationConfig: config
+        // FIXED: generationConfig and safetySettings are now separate, top-level properties
+        generationConfig: generationConfig,
+        safetySettings: settings.safetySettings
     });
     
     // Send message with streaming
