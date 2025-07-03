@@ -38,10 +38,22 @@ export async function send(msg, db) {
         document.querySelector(`#chat${id}`).click();
         currentChat = await chatsService.getCurrentChat(db);
     }
+    
+    // --- NEW: Reminder Logic ---
+    // Check if the selected personality has a reminder text.
+    let apiMsg = msg;
+    if (selectedPersonality.reminder && selectedPersonality.reminder.trim() !== "") {
+        // If it does, append it to the message being sent to the API.
+        // This does NOT get saved in the chat history.
+        apiMsg = `${msg}\n\n${selectedPersonality.reminder}`;
+    }
+    // --- End of Reminder Logic ---
 
     const history = buildContentHistory(currentChat);
-    const contents = [...history, { role: 'user', parts: [{ text: msg }] }];
+    // Use the potentially modified message (with reminder) for the API call.
+    const contents = [...history, { role: 'user', parts: [{ text: apiMsg }] }];
 
+    // Use the ORIGINAL, unmodified message to save to the database.
     const userMessage = { role: "user", parts: [{ text: msg }] };
     currentChat.content.push(userMessage);
     await insertMessage(userMessage, currentChat.content.length - 1, db);
@@ -63,11 +75,8 @@ export async function send(msg, db) {
         safetySettings: settings.safetySettings
     });
 
-    // --- THIS IS THE FIX ---
-    // Make the stateless API call
     const result = await model.generateContentStream({ contents });
     
-    // Stream the response and save it, using the correct variable name `result.stream`
     const placeholder = await insertMessage({ role: 'model' }, currentChat.content.length, db, selectedPersonality);
     const reply = await streamResponse(placeholder, result.stream); 
 
@@ -89,8 +98,17 @@ async function regenerate(messageIndex, db) {
     const selectedPersonality = await personalityService.getSelected();
     let currentChat = await chatsService.getCurrentChat(db);
 
+    // --- NEW: Reminder Logic for Regeneration ---
+    const originalUserMsgText = currentChat.content[messageIndex - 1].parts[0].text;
+    let apiMsg = originalUserMsgText;
+    if (selectedPersonality.reminder && selectedPersonality.reminder.trim() !== "") {
+        apiMsg = `${originalUserMsgText}\n\n${selectedPersonality.reminder}`;
+    }
+    // --- End of Reminder Logic ---
+
     const history = buildContentHistory(currentChat, messageIndex);
-    const contents = [...history, { role: 'user', parts: [{ text: currentChat.content[messageIndex-1].parts[0].text }] }];
+    // Use the modified message for the API call
+    const contents = [...history, { role: 'user', parts: [{ text: apiMsg }] }];
 
     const mainSystemPrompt = settingsService.getSystemPrompt();
     const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;

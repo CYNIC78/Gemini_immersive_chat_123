@@ -27,12 +27,21 @@ export function showEditPersonalityForm(personality) {
                 input.value = tone;
                 personalityForm.querySelector("#btn-add-tone-example").before(input);
             }
+            continue; // Continue to the next key after handling toneExamples
         }
         const input = personalityForm.querySelector(`[name="${key}"]`);
         if (!input) {
             continue;
         }
-        input.value = personality[key];
+
+        // --- UPDATED LOGIC ---
+        // This now correctly handles checkboxes as well as regular text inputs.
+        if (input.type === 'checkbox') {
+            input.checked = personality[key];
+        } else {
+            input.value = personality[key];
+        }
+        // --- END OF UPDATE ---
     }
     showElement(overlay, false);
     showElement(personalityForm, false);
