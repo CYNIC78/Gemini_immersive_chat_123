@@ -250,15 +250,18 @@
                 <div class="stepper first-step" id="stepper-add-personality">
                     <div class="stepper-content">
                         <div class="step active">
-                            <!-- we match the name property of each input to the corresponding key in our personality model (Personality.service.js) -->
                             <h3>Basic Info & Scene</h3>
                             <input style="display: none;" name="id">
                             <label for="name">Name:</label>
                             <input type="text" name="name" placeholder="Mario" list="name-list">
+                            
+                            <!-- NEW: Default Avatar Tag -->
+                            <label for="defaultAvatarTag">Default Avatar Tag:</label>
+                            <input type="text" name="defaultAvatarTag" placeholder="e.g., default, neutral" value="default">
+
                             <label for="description">Description:</label>
                             <input type="text" name="description" placeholder="A  plumber with a shroom addiction.">
-                            <label for="image">Image URL:</label>
-                            <input type="text" name="image" placeholder="https://example.com/mario.png">
+                            
                             <label for="prompt">System Prompt:</label>
                             <textarea name="prompt"
                                 placeholder="You are to act as main character from the Mario video game series..."
@@ -274,7 +277,6 @@
                                 placeholder="Instruct the AI on how to write the very first message. Example: Greet the user and ask them which tome they are looking for."
                                 class="stepper-textarea"></textarea>
                             
-                            <!-- *** CUSTOM JAVASCRIPT SECTION *** -->
                             <label for="customScript">Custom JavaScript (Advanced):
                                 <span class="material-symbols-outlined tooltip" 
                                 style="font-size: 0.885rem; opacity: 0.6; cursor:default"
@@ -283,9 +285,10 @@
                                 </span> 
                             </label>
                             <textarea name="customScript"
-                                placeholder="/* Example: Change avatar based on mood */
+                                placeholder="/* Example using the Asset Manager */
 if (modelResponse.toLowerCase().includes('happy')) {
-  character.image = 'https://example.com/happy_aphrodite.png';
+  const happyImage = getImageByTag('happy');
+  if (happyImage) { character.image = happyImage; }
 }
 return { character, modelResponse };"
                                 class="stepper-textarea"
@@ -311,7 +314,6 @@ return { character, modelResponse };"
                                 <option value="3">3</option>
                             </datalist>
                             <h3>Tweaks</h3>
-                            <!-- internet access toggle -->
                             <div style="display: flex; gap: 0.25rem; align-items: center;">
                                 <input id="internet-access" type="checkbox" name="internetEnabled"></input>
                                 <label for="internet-access">Internet Access</label>
@@ -319,7 +321,6 @@ return { character, modelResponse };"
                                     style="font-size: 0.885rem; opacity: 0.6; cursor:default"
                                     info="Enhance the model's responses with online search queries. Useful for fact checking and grounding. Currently still in development.">info</span>
                             </div>
-                            <!-- roleplay toggle -->
                             <div style="display: flex; gap: 0.25rem; align-items: center;">
                                 <input id="roleplay" type="checkbox" name="roleplayEnabled"></input>
                                 <label for="roleplay">Roleplay</label>
@@ -344,11 +345,9 @@ return { character, modelResponse };"
                             <button type="button" id="btn-add-tone-example"
                                 class="material-symbols-outlined">add_circle</button>
                         </div>
-                        <!-- *** NEW ASSET MANAGER STEP *** -->
                         <div class="step">
                             <h3>Asset Manager</h3>
                             <div class="asset-manager-container">
-                                <!-- Groups Panel -->
                                 <div class="asset-groups-panel">
                                     <h4>Groups</h4>
                                     <div class="input-with-button">
@@ -356,11 +355,9 @@ return { character, modelResponse };"
                                         <button type="button" id="btn-add-group" class="material-symbols-outlined btn-textual" title="Add Group">add_circle</button>
                                     </div>
                                     <div id="asset-groups-list">
-                                        <!-- Group items will be dynamically inserted here by JavaScript -->
-                                        <div class="group-item active">All Assets</div> <!-- Example -->
+                                        <div class="group-item active">All Assets</div>
                                     </div>
                                 </div>
-                                <!-- Assets Gallery Panel -->
                                 <div class="asset-gallery-panel">
                                     <div class="asset-gallery-header">
                                         <h4 id="current-group-header">All Assets</h4>
@@ -370,7 +367,6 @@ return { character, modelResponse };"
                                         </button>
                                     </div>
                                     <div id="asset-gallery-grid">
-                                        <!-- Asset cards will be dynamically inserted here by JavaScript -->
                                     </div>
                                 </div>
                             </div>

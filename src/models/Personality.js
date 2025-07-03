@@ -1,7 +1,6 @@
 export class Personality {
     constructor(
         name = "", 
-        image = "", 
         description = "", 
         prompt = "", 
         scenario = "", 
@@ -13,10 +12,11 @@ export class Personality {
         roleplayEnabled = false, 
         toneExamples = [],
         customScript = "",
-        assets = [] // NEW: An array to hold media assets
+        assets = [],
+        defaultAvatarTag = "default" // NEW: Default avatar tag
         ) {
         this.name = name;
-        this.image = image;
+        // this.image is no longer needed here as it's derived from assets
         this.description = description;
         this.prompt = prompt;
         this.scenario = scenario;
@@ -28,6 +28,7 @@ export class Personality {
         this.roleplayEnabled = roleplayEnabled;
         this.toneExamples = toneExamples;
         this.customScript = customScript;
-        this.assets = assets; // NEW: Assign the assets array
+        this.assets = assets;
+        this.defaultAvatarTag = defaultAvatarTag; // NEW
     }
 }
