@@ -1,11 +1,24 @@
 import { HarmBlockThreshold, HarmCategory } from "@google/genai";
 
+// --- DOM Element References ---
 const ApiKeyInput = document.querySelector("#apiKeyInput");
 const maxTokensInput = document.querySelector("#maxTokens");
 const temperatureInput = document.querySelector("#temperature");
 const modelSelect = document.querySelector("#selectedModel");
 const autoscrollToggle = document.querySelector("#autoscroll");
 
+// --- Local Storage Keys ---
+const STORAGE_KEYS = {
+    API_KEY: "API_KEY",
+    MAX_TOKENS: "maxTokens",
+    TEMPERATURE: "TEMPERATURE",
+    MODEL: "model",
+    AUTOSCROLL: "autoscroll"
+};
+
+/**
+ * Initializes the settings service. Loads settings and adds event listeners.
+ */
 export function initialize() {
     loadSettings();
     ApiKeyInput.addEventListener("input", saveSettings);
@@ -15,27 +28,39 @@ export function initialize() {
     autoscrollToggle.addEventListener("change", saveSettings);
 }
 
+/**
+ * Loads all settings from the browser's local storage and applies them to the UI.
+ * Uses default values if no setting is found.
+ */
 export function loadSettings() {
-    ApiKeyInput.value = localStorage.getItem("API_KEY") || "";
-    maxTokensInput.value = localStorage.getItem("maxTokens") || 1000;
-    temperatureInput.value = localStorage.getItem("TEMPERATURE") || 70;
-    modelSelect.value = localStorage.getItem("model") || "gemini-2.5-flash";
-    autoscrollToggle.checked = localStorage.getItem("autoscroll") === "true";
+    ApiKeyInput.value = localStorage.getItem(STORAGE_KEYS.API_KEY) || "";
+    maxTokensInput.value = localStorage.getItem(STORAGE_KEYS.MAX_TOKENS) || 1000;
+    temperatureInput.value = localStorage.getItem(STORAGE_KEYS.TEMPERATURE) || 70;
+    modelSelect.value = localStorage.getItem(STORAGE_KEYS.MODEL) || "gemini-2.5-flash";
+    autoscrollToggle.checked = localStorage.getItem(STORAGE_KEYS.AUTOSCROLL) === "true";
 }
 
+/**
+ * Saves the current state of all settings from the UI to local storage.
+ */
 export function saveSettings() {
-    localStorage.setItem("API_KEY", ApiKeyInput.value);
-    localStorage.setItem("maxTokens", maxTokensInput.value);
-    localStorage.setItem("TEMPERATURE", temperatureInput.value);
-    localStorage.setItem("model", modelSelect.value);
-    localStorage.setItem("autoscroll", autoscrollToggle.checked);
+    localStorage.setItem(STORAGE_KEYS.API_KEY, ApiKeyInput.value);
+    localStorage.setItem(STORAGE_KEYS.MAX_TOKENS, maxTokensInput.value);
+    localStorage.setItem(STORAGE_KEYS.TEMPERATURE, temperatureInput.value);
+    localStorage.setItem(STORAGE_KEYS.MODEL, modelSelect.value);
+    localStorage.setItem(STORAGE_KEYS.AUTOSCROLL, autoscrollToggle.checked);
 }
 
+/**
+ * Gathers the current settings from the UI and formats them for an API call.
+ * @returns {object} The settings object for the Gemini API.
+ */
 export function getSettings() {
     return {
         apiKey: ApiKeyInput.value,
         maxTokens: maxTokensInput.value,
         temperature: temperatureInput.value,
+        // Safety settings are hardcoded to be as permissive as possible.
         safetySettings: [
             { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
             { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -44,10 +69,16 @@ export function getSettings() {
         ],
         model: modelSelect.value,
         autoscroll: autoscrollToggle.checked,
-    }
+    };
 }
 
+/**
+ * Constructs and returns the main system prompt that instructs the AI on its behavior.
+ * @returns {string} The complete system prompt.
+ */
 export function getSystemPrompt() {
+    // This prompt provides detailed instructions on how the AI should behave based on
+    // personality traits like aggressiveness and sensuality.
     const systemPrompt = "If needed, format your answer using markdown. " +
         "Today's date is " + new Date().toDateString() + ". " +
         "You are to act as the personality dictated by the user. " +
@@ -61,7 +92,7 @@ export function getSystemPrompt() {
         "Sensuality guidelines: " +
         "3 requires you to be very sensual. You must be flirtatious and suggestive. Most of the time, you are the one to initiate sexual topics or actions. " +
         "2 requires you to be moderately sensual. You may flirt and be suggestive. Do not initiate sexual topics unless the user does so, after which you may be open to discussing them. " +
-        "1 requires you to be slightly sensual. Affection and love may be shared but it is platonic and non sexual. " +
+g        "1 requires you to be slightly sensual. Affection and love may be shared but it is platonic and non sexual. " +
         "0 requires you to be non-sensual. Total aversion to flirting or sexuality. If aggressiveness is 0, you may not reject the user's advances, but you do not reciprocate or enjoy them. " +
         "End of system prompt.";
     return systemPrompt;

@@ -1,118 +1,101 @@
-// Wait for the page content to be fully loaded before running script
-document.addEventListener('DOMContentLoaded', () => {
+// Aphrodisiac | main.js - Application Entry Point
 
-    // Select the elements we need to work with
-    const container = document.querySelector('.container');
-    const btnHideSidebar = document.querySelector('#btn-hide-sidebar');
-    const btnShowSidebar = document.querySelector('#btn-show-sidebar');
-
-    // --- Sidebar Toggle Logic ---
-
-    // When the "Hide" button is clicked...
-    btnHideSidebar.addEventListener('click', () => {
-        container.classList.add('sidebar-hidden');
-        // Optional: Save the state so the browser remembers
-        localStorage.setItem('sidebarState', 'hidden');
-    });
-
-    // When the "Show" button is clicked...
-    btnShowSidebar.addEventListener('click', () => {
-        container.classList.remove('sidebar-hidden');
-        // Optional: Save the state so the browser remembers
-        localStorage.setItem('sidebarState', 'visible');
-    });
-
-    // --- Check for saved state on page load ---
-    // This makes the page remember if the sidebar was hidden on the last visit
-    if (localStorage.getItem('sidebarState') === 'hidden') {
-        container.classList.add('sidebar-hidden');
-    }
-
-    /* 
-       ... ALL YOUR OTHER main.js CODE CAN GO HERE,
-       INSIDE THE DOMContentLoaded LISTENER ...
-    */
-
-});
-
-
-
-
-
-import * as personalityService from "./services/Personality.service";
+// --- IMPORTS ---
+// Import services for core functionality.
 import * as settingsService from "./services/Settings.service";
+import * as personalityService from "./services/Personality.service";
 import * as overlayService from './services/Overlay.service';
-import * as chatsService from './services/Chats.service';
-import { db } from './services/Db.service';
+import *as chatsService from './services/Chats.service';
+import { db } from './services/Db.service'; // Direct import of the database instance
 import * as helpers from "./utils/helpers";
 
-//load all component code
+// --- DYNAMIC COMPONENT LOADING ---
+// Automatically discovers and executes all component scripts in the components folder.
+// This makes the app modular and easier to maintain without needing to import each one manually.
 const components = import.meta.glob('./components/*.js');
 for (const path in components) {
     components[path]();
 }
 
-// Initialize in the correct order
-settingsService.initialize();
+// --- INITIALIZATION ---
+// Initializes the application in a specific order to ensure dependencies are met.
+async function initialize() {
+    // 1. Load user settings first, as other services may depend on them.
+    settingsService.initialize();
 
-// Initialize database and migrate
-await chatsService.initialize(db);
-await personalityService.migratePersonalities(db);
-await personalityService.initialize();
+    // 2. Initialize the database and migrate data schemas if needed.
+    await chatsService.initialize(db);
+    await personalityService.migratePersonalities(db);
 
-//event listeners
-const hideOverlayButton = document.querySelector("#btn-hide-overlay");
-hideOverlayButton.addEventListener("click", () => overlayService.closeOverlay());
+    // 3. Initialize services that populate the UI from the database.
+    await personalityService.initialize();
+}
 
-const newChatButton = document.querySelector("#btn-new-chat");
-newChatButton.addEventListener("click", () => {
-    if (!chatsService.getCurrentChatId()) {
-        return
-    }
-    chatsService.newChat();
-});
+// --- EVENT LISTENERS ---
+// Binds UI elements to their respective service functions.
+function setupEventListeners() {
+    document.querySelector("#btn-hide-overlay").addEventListener("click", () => overlayService.closeOverlay());
 
-
-
-
-
-
-
-const clearAllButton = document.querySelector("#btn-clearall-personality");
-clearAllButton.addEventListener("click", () => {
-    personalityService.removeAll();
-});
-
-const deleteAllChatsButton = document.querySelector("#btn-reset-chat");
-deleteAllChatsButton.addEventListener("click", () => { chatsService.deleteAllChats(db) });
-
-
-const importPersonalityButton = document.querySelector("#btn-import-personality");
-importPersonalityButton.addEventListener("click", () => {
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.addEventListener('change', () => {
-        const file = fileInput.files[0];
-        const reader = new FileReader();
-        reader.onload = function (e) {
-            const personality = JSON.parse(e.target.result);
-            personalityService.add(personality);
-        };
-        reader.readAsText(file);
-    });
-    fileInput.click();
-    fileInput.remove();
-});
-
-window.addEventListener("resize", () => {
-    //show sidebar if window is resized to desktop size
-    if (window.innerWidth > 1032) {
-        const sidebarElement = document.querySelector(".sidebar");
-        //to prevent running showElement more than necessary
-        if (sidebarElement.style.opacity == 0) {
-            helpers.showElement(sidebarElement, false);
+    document.querySelector("#btn-new-chat").addEventListener("click", () => {
+        // Prevent creating a new chat if the current one is already empty.
+        if (!chatsService.getCurrentChatId()) {
+            return;
         }
-    }
+        chatsService.newChat();
+    });
+
+    document.querySelector("#btn-clearall-personality").addEventListener("click", () => {
+        if (confirm("Are you sure you want to delete all custom personalities?")) {
+            personalityService.removeAll();
+        }
+    });
+
+    document.querySelector("#btn-reset-chat").addEventListener("click", () => {
+        if (confirm("Are you sure you want to delete all chats? This cannot be undone.")) {
+            chatsService.deleteAllChats(db);
+        }
+    });
+
+    document.querySelector("#btn-import-personality").addEventListener("click", () => {
+        // Create a temporary, hidden file input to trigger the browser's file picker.
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.json'; // Restrict selection to JSON files.
+
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return; // Exit if no file was selected.
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    const personality = JSON.parse(e.target.result);
+                    personalityService.add(personality);
+                } catch (error) {
+                    console.error("Failed to parse personality JSON:", error);
+                    alert("Error: The selected file is not a valid personality JSON.");
+                }
+            };
+            reader.readAsText(file);
+        });
+        fileInput.click();
+    });
+
+    // Handles responsive behavior for the sidebar.
+    window.addEventListener("resize", () => {
+        // Automatically show the sidebar on larger screens if it was hidden.
+        if (window.innerWidth > 1032) {
+            const container = document.querySelector(".container");
+            if (container.classList.contains("sidebar-hidden")) {
+                container.classList.remove("sidebar-hidden");
+            }
+        }
+    });
+}
+
+// --- APP START ---
+// Run the initialization and set up listeners once the DOM is ready.
+document.addEventListener('DOMContentLoaded', () => {
+    initialize();
+    setupEventListeners();
 });
-
-

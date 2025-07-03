@@ -1,6 +1,12 @@
 {
-  "devDependencies": {
-    "vite": "^6.2.2"
+  "name": "aphrodisiac",
+  "version": "1.0.0",
+  "description": "A custom web-based frontend for Google's Gemini API.",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@google/genai": "^0.8.0",
@@ -8,9 +14,7 @@
     "dompurify": "^3.2.3",
     "tippy.js": "^6.3.7"
   },
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+  "devDependencies": {
+    "vite": "^5.2.2"
   }
 }
