@@ -51,13 +51,11 @@ export async function initialize() {
 }
 
 export async function getSelected() {
-    // --- THIS IS THE FIX ---
-    // The string now correctly ends with a double quote.
     const selectedRadio = document.querySelector("input[name='personality']:checked");
     if (!selectedRadio) return getDefault(); // Failsafe
 
     const parentLabel = selectedRadio.parentElement;
-    if (!parentLabel.id) { // This handles the default personality which might not have a DB ID
+    if (!parentLabel.id) {
         return getDefault();
     }
 
@@ -69,17 +67,12 @@ export async function getSelected() {
 }
 
 export function getDefault() {
-    // UPDATED: Added an empty string for the new customScript field.
     return new Personality(
         'Aphrodite', 
         '/assets/default/images/Aphrodite.png',
         'Aphrodite is playful, flirtatious, and passionate, she knows how to captivate every conversation partner.',
         "You are Aphrodite, the ancient Greek goddess of love, beauty, and passion. You embody femininity and seduction, possessing otherworldly beauty and magnetic charm. Your personality is multifaceted: you can be playful and flirtatious, passionate and sensual, wise in matters of the heart and relationships.",
-        "", // scenario
-        "", // firstMessagePrompt
-        "", // reminder
-        0, 0, false, false, [],
-        "" // customScript
+        "", "", "", 0, 0, false, false, [], "", []
     );
 }
 
@@ -93,24 +86,17 @@ export async function get(id) {
 export async function getByName(name, database = null) {
     if (!name) return null;
     
-    // Handle default personality by its actual name
     if (name.toLowerCase() === "aphrodite") {
         return { ...getDefault(), id: -1 };
     }
 
     const dbToUse = database || db;
     try {
-        // First try exact match
         let personality = await dbToUse.personalities.where('name').equals(name).first();
-        
-        // If not found, try case-insensitive search
         if (!personality) {
             const allPersonalities = await dbToUse.personalities.toArray();
-            personality = allPersonalities.find(p => 
-                p.name.toLowerCase() === name.toLowerCase()
-            );
+            personality = allPersonalities.find(p => p.name.toLowerCase() === name.toLowerCase());
         }
-        
         return personality || null;
     } catch (error) {
         console.error(`Error finding personality by name: ${name}`, error);
@@ -143,14 +129,11 @@ function insert(personality) {
 export function share(personality) {
     const personalityCopy = { ...personality }
     delete personalityCopy.id
-    //export personality to a string
     const personalityString = JSON.stringify(personalityCopy)
-    //download
     const element = document.createElement('a');
     element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(personalityString));
     element.setAttribute('download', `${personality.name}.json`);
     element.style.display = 'none';
-    //appending the element is required for firefox
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
@@ -160,16 +143,10 @@ export function createAddPersonalityCard() {
     const card = document.createElement("div");
     card.classList.add("card-personality", "card-add-personality");
     card.id = "btn-add-personality";
-    card.innerHTML = `
-        <div class="add-personality-content">
-            <span class="material-symbols-outlined add-icon">add</span>
-        </div>
-    `;
-    
+    card.innerHTML = `<div class="add-personality-content"><span class="material-symbols-outlined add-icon">add</span></div>`;
     card.addEventListener("click", () => {
         overlayService.showAddPersonalityForm();
     });
-    
     return card;
 }
 
@@ -183,13 +160,8 @@ export async function removeAll() {
 }
 
 export async function add(personality) {
-    const id = await db.personalities.add(personality); //insert in db
-    insert({
-        id: id,
-        ...personality
-    });
-    
-    // Move the add card to be the last element
+    const id = await db.personalities.add(personality);
+    insert({ id: id, ...personality });
     const addCard = document.querySelector("#btn-add-personality");
     if (addCard) {
         document.querySelector("#personalitiesDiv").appendChild(addCard);
@@ -200,10 +172,12 @@ export async function edit(id, personality) {
     const element = document.querySelector(`#personality-${id}`);
     const input = element.querySelector("input");
 
-    await db.personalities.update(id, personality);
+    const existingPersonality = await db.personalities.get(id);
+    const updatedPersonality = { ...existingPersonality, ...personality }; // Merge old and new
 
-    //reselect the personality if it was selected prior
-    element.replaceWith(generateCard({ id, ...personality }));
+    await db.personalities.update(id, updatedPersonality);
+
+    element.replaceWith(generateCard({ id, ...updatedPersonality }));
     if (input.checked) {
         document.querySelector(`#personality-${id}`).querySelector("input").click();
     }
@@ -231,7 +205,6 @@ export function generateCard(personality) {
             </div>
             `;
 
-    // Add event listeners
     const shareButton = card.querySelector(".btn-share-card");
     const deleteButton = card.querySelector(".btn-delete-card");
     const editButton = card.querySelector(".btn-edit-card");
@@ -242,7 +215,6 @@ export function generateCard(personality) {
     });
     if (deleteButton) {
         deleteButton.addEventListener("click", () => {
-            //first if the personality to delete is the one currently selected, we select the default personality
             if (input.checked) {
                 document.querySelector("#personalitiesDiv").firstElementChild.click();
             }
