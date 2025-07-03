@@ -55,7 +55,7 @@ export async function generateFirstMessage(db) {
     const contents = [{ role: 'user', parts: [{ text: firstMessageUserContent }] }];
     const result = await model.generateContentStream({ contents });
     
-    const placeholder = await insertMessage({ role: 'model' }, 0, db, selectedPersonality);
+    const placeholder = await insertMessage({ role: 'model' }, 0, db, selectedPersonality); // Insert at index 0
     const reply = await streamResponse(placeholder, result.stream); 
 
     const modelMessage = {
@@ -137,12 +137,14 @@ export async function send(msg, db) {
     await chatsService.loadChat(currentChat.id, db);
 }
 
-async function regenerate(messageIndex, db) {
+// Function to regenerate a MODEL message based on the previous USER message
+async function regenerate(messageIndex, db) { // This is triggered on a MODEL message at messageIndex
     const settings = settingsService.getSettings();
     const selectedPersonality = await personalityService.getSelected();
     let currentChat = await chatsService.getCurrentChat(db);
     let contents = [];
 
+    // If regenerating the very first message (which is always a model message after character's initial prompt)
     if (messageIndex === 0) {
         let firstMessageUserContent = selectedPersonality.firstMessagePrompt;
         if (selectedPersonality.scenario && selectedPersonality.scenario.trim() !== "") {
@@ -150,12 +152,14 @@ async function regenerate(messageIndex, db) {
         }
         contents = [{ role: 'user', parts: [{ text: firstMessageUserContent }] }];
     } else {
-        const originalUserMsgText = currentChat.content[messageIndex - 1].parts[0].text;
+        // This is for all other model messages. They are regenerated based on the *previous* user message.
+        const originalUserMsgText = currentChat.content[messageIndex - 1].parts[0].text; // Get the user's message text
         let apiMsg = originalUserMsgText;
         if (selectedPersonality.reminder && selectedPersonality.reminder.trim() !== "") {
             apiMsg = `${originalUserMsgText}\n\n${selectedPersonality.reminder}`;
         }
-        const history = buildContentHistory(currentChat, messageIndex);
+        // Build history up to the user message *before* the model message being regenerated
+        const history = buildContentHistory(currentChat, messageIndex - 1); // Exclude the model message itself
         contents = [...history, { role: 'user', parts: [{ text: apiMsg }] }];
     }
     
@@ -176,12 +180,99 @@ async function regenerate(messageIndex, db) {
     messageContentEl.innerHTML = '';
     const reply = await streamResponse({ querySelector: () => messageContentEl }, result.stream);
 
-    const modelMessage = currentChat.content[messageIndex];
+    const modelMessage = currentChat.content[messageIndex]; // This is the model message being replaced
     modelMessage.versions.push({ text: reply.md });
     modelMessage.activeVersion = modelMessage.versions.length - 1;
 
     await db.chats.put(currentChat);
     await chatsService.loadChat(currentChat.id, db);
+}
+
+// --- NEW FUNCTION: Regenerates the AI's response to a specific user message ---
+async function regenerateUserMessage(userMessageIndex, db) {
+    const settings = settingsService.getSettings();
+    const selectedPersonality = await personalityService.getSelected();
+    if (!selectedPersonality || !settings.apiKey) {
+        console.error("Missing required data for regenerating user message response.");
+        return;
+    }
+
+    let currentChat = await chatsService.getCurrentChat(db);
+    const userMessage = currentChat.content[userMessageIndex];
+
+    if (!userMessage || userMessage.role !== "user") {
+        console.error("Cannot regenerate non-user message or invalid index.");
+        return;
+    }
+
+    // Check if there's a model message immediately after this user message
+    const existingModelMessageIndex = userMessageIndex + 1;
+    const existingModelMessage = currentChat.content[existingModelMessageIndex];
+
+    // Prepare the message to send to the AI (with reminder)
+    let apiMsg = userMessage.parts[0].text;
+    if (selectedPersonality.reminder && selectedPersonality.reminder.trim() !== "") {
+        apiMsg = `${apiMsg}\n\n${selectedPersonality.reminder}`;
+    }
+
+    // Build history up to and including the user message we are regenerating for
+    // +1 because buildContentHistory's stoppingIndex is exclusive
+    const history = buildContentHistory(currentChat, userMessageIndex + 1); 
+
+    const mainSystemPrompt = settingsService.getSystemPrompt();
+    const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
+    const fullSystemInstruction = mainSystemPrompt + "\n\n" + characterPrompt;
+
+    const ai = new GoogleGenerativeAI(settings.apiKey);
+    const generationConfig = {
+        maxOutputTokens: parseInt(settings.maxTokens),
+        temperature: settings.temperature / 100,
+    };
+    const model = ai.getGenerativeModel({
+        model: settings.model,
+        systemInstruction: fullSystemInstruction,
+        generationConfig: generationConfig,
+        safetySettings: settings.safetySettings
+    });
+
+    // Make the API call using the history that includes the user's message
+    const contents = history; 
+
+    const result = await model.generateContentStream({ contents });
+
+    let placeholderElement;
+    let newModelMessage;
+
+    if (existingModelMessage && existingModelMessage.role === "model") {
+        // If there's an existing model response, stream into its element
+        placeholderElement = document.querySelector(`.message-container .message:nth-child(${existingModelMessageIndex + 1})`);
+        placeholderElement.querySelector('.message-text').innerHTML = ''; // Clear existing content
+        newModelMessage = existingModelMessage; // Reuse existing message object
+
+    } else {
+        // If no existing model response, create a new one
+        newModelMessage = {
+            role: "model",
+            personality: selectedPersonality.name,
+            personalityid: selectedPersonality.id,
+            versions: [], // Will be filled by streamResponse
+            activeVersion: 0
+        };
+        // Insert a new placeholder for the model response and add to chat content
+        placeholderElement = await insertMessage(newModelMessage, existingModelMessageIndex, db, selectedPersonality);
+        currentChat.content.splice(existingModelMessageIndex, 0, newModelMessage); 
+    }
+    
+    // Stream the response into the selected placeholder element
+    const reply = await streamResponse({ querySelector: (selector) => placeholderElement.querySelector(selector) }, result.stream);
+    
+    // Update the message object with the new version
+    newModelMessage.versions.push({ text: reply.md });
+    newModelMessage.activeVersion = newModelMessage.versions.length - 1;
+
+    // Update the entire chat in the database and reload UI
+    await db.chats.put(currentChat);
+    await chatsService.loadChat(currentChat.id, db); 
 }
 
 async function streamResponse(messageElement, netStream) {
@@ -210,6 +301,8 @@ export async function insertMessage(msgObj, index, db, personality = null) {
     const messageContainer = document.querySelector(".message-container");
     messageContainer.append(newMessage);
 
+    let messageContentEl; // We'll define this later based on message role
+
     if (msgObj.role === "model") {
         newMessage.classList.add("message-model");
         const pfpSrc = personality ? personality.image : '';
@@ -226,19 +319,16 @@ export async function insertMessage(msgObj, index, db, personality = null) {
                 <div class="message-actions">
                     ${hasVersions ? `<div class="version-swiper"><button class="btn-version-prev btn-textual material-symbols-outlined">chevron_left</button><span>${activeVersion + 1}/${msgObj.versions.length}</span><button class="btn-version-next btn-textual material-symbols-outlined">chevron_right</button></div>` : ''}
                     <button class="btn-refresh btn-textual material-symbols-outlined" title="Regenerate response">refresh</button>
-                    <button class="btn-edit btn-textual material-symbols-outlined" title="Edit message">edit</button>
                     <button class="btn-delete btn-textual material-symbols-outlined" title="Delete message">delete</button>
                 </div>
             </div>
-            <!-- UX IMPROVEMENT: Make model messages directly editable -->
             <div class="message-text" contenteditable="true">${marked.parse(versionText, { breaks: true })}</div>`;
         hljs.highlightAll();
 
+        messageContentEl = newMessage.querySelector(".message-text");
+
         newMessage.querySelector(".btn-refresh").addEventListener("click", () => regenerate(index, db));
         newMessage.querySelector(".btn-delete").addEventListener("click", () => deleteMessage(index, db));
-        
-        // UX IMPROVEMENT: We no longer need the edit button listener, just the blur listener to save.
-        const messageContentEl = newMessage.querySelector(".message-text");
         
         messageContentEl.addEventListener("blur", async () => {
             const currentChat = await chatsService.getCurrentChat(db);
@@ -257,14 +347,19 @@ export async function insertMessage(msgObj, index, db, personality = null) {
         newMessage.classList.add("message-user");
         newMessage.innerHTML = `
             <div class="message-header"><h3 class="message-role">You</h3><div class="message-actions">
-                <button class="btn-edit btn-textual material-symbols-outlined" title="Edit message">edit</button>
+                <!-- NEW: Add Regenerate button for User Messages -->
+                <button class="btn-refresh btn-textual material-symbols-outlined" title="Regenerate response">refresh</button>
                 <button class="btn-delete btn-textual material-symbols-outlined" title="Delete message">delete</button>
             </div></div>
             <div class="message-text" contenteditable="true">${marked.parse(msgObj.parts[0].text, { breaks: true })}</div>`;
         
+        messageContentEl = newMessage.querySelector(".message-text");
+
+        // NEW: Add event listener for the regenerate button on user messages
+        newMessage.querySelector(".btn-refresh").addEventListener("click", () => regenerateUserMessage(index, db));
+
         newMessage.querySelector(".btn-delete").addEventListener("click", () => deleteMessage(index, db));
         
-        const messageContentEl = newMessage.querySelector(".message-text");
         messageContentEl.addEventListener("blur", async () => {
             const currentChat = await chatsService.getCurrentChat(db);
             currentChat.content[index].parts[0].text = messageContentEl.textContent;
