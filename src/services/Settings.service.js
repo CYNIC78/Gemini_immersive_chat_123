@@ -1,4 +1,4 @@
-import { HarmBlockThreshold, HarmCategory } from "@google/generative-ai";
+import { HarmBlockThreshold, HarmCategory } from "@google/genai";
 
 // --- DOM Element Selectors ---
 const apiKeySelector = document.querySelector("#apiKeySelector");
