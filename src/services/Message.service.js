@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { marked } from "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js";
 import * as settingsService from "./Settings.service.js";
 import * as personalityService from "./Personality.service.js";
@@ -105,7 +105,7 @@ export async function send(msg, db) {
 
     let currentChat = await chatsService.getCurrentChat(db);
     if (!currentChat) {
-        const ai = new GoogleGenerativeAI(settings.apiKey);
+        const ai = new GoogleGenAI(settings.apiKey);
         const titleModel = ai.getGenerativeModel({ model: settings.model });
         const titleResult = await titleModel.generateContent(`Create a short, concise title (6 words max) for a chat that starts with this message. Do NOT add extra text or quotes. Message: "${msg}"`);
         const id = await chatsService.addChat(titleResult.response.text(), null, db);
@@ -122,7 +122,7 @@ export async function send(msg, db) {
     const history = buildContentHistory(currentChat);
     const contents = [...history, { role: 'user', parts: [{ text: apiMsg }] }];
     
-    const ai = new GoogleGenerativeAI(settings.apiKey);
+    const ai = new GoogleGenAI(settings.apiKey);
     const mainSystemPrompt = settingsService.getSystemPrompt();
     const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
     
@@ -158,7 +158,7 @@ async function regenerate(messageIndex, db) {
     const history = buildContentHistory(currentChat, messageIndex);
     const contents = [...history, { role: 'user', parts: [{ text: userMessageText }] }];
 
-    const ai = new GoogleGenerativeAI(settings.apiKey);
+    const ai = new GoogleGenAI(settings.apiKey);
     const mainSystemPrompt = settingsService.getSystemPrompt();
     const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
     
@@ -204,7 +204,7 @@ async function regenerateUserMessage(userMessageIndex, db) {
     const history = buildContentHistory(currentChat, userMessageIndex + 1);
     const contents = history;
 
-    const ai = new GoogleGenerativeAI(settings.apiKey);
+    const ai = new GoogleGenAI(settings.apiKey);
     const mainSystemPrompt = settingsService.getSystemPrompt();
     const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
 
