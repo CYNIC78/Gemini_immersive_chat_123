@@ -9,10 +9,15 @@ const maxTokensInput = document.querySelector("#maxTokens");
 const temperatureInput = document.querySelector("#temperature");
 const modelSelect = document.querySelector("#selectedModel");
 const autoscrollToggle = document.querySelector("#autoscroll");
-const typingSpeedInput = document.querySelector("#typingSpeed"); // Our features remain
-const safetySettingsSelect = document.querySelector("#safetySettings"); // Our features remain
-
-// Note: Color settings and other advanced features are kept, as they don't affect the API call.
+const typingSpeedInput = document.querySelector("#typingSpeed");
+const safetySettingsSelect = document.querySelector("#safetySettings");
+const colorPrimaryBgInput = document.querySelector("#colorPrimaryBg");
+const colorSecondaryBgInput = document.querySelector("#colorSecondaryBg");
+const colorTertiaryBgInput = document.querySelector("#colorTertiaryBg");
+const colorPrimaryTextInput = document.querySelector("#colorPrimaryText");
+const colorAccentInput = document.querySelector("#colorAccent");
+const colorButtonTextInput = document.querySelector("#colorButtonText");
+const btnResetColors = document.querySelector("#btn-reset-colors");
 
 let apiKeys = [];
 let activeApiKeyIndex = 0;
@@ -46,12 +51,14 @@ function setActiveApiKey() { activeApiKeyIndex = parseInt(apiKeySelector.value, 
 function loadOtherSettings() { if (!maxTokensInput) return; maxTokensInput.value = localStorage.getItem("maxTokens") || 1000; temperatureInput.value = localStorage.getItem("TEMPERATURE") || 70; modelSelect.value = localStorage.getItem("model") || "gemini-2.5-flash-preview-04-17"; safetySettingsSelect.value = localStorage.getItem("safetyLevel") || "risky"; autoscrollToggle.checked = localStorage.getItem("autoscroll") === "true"; typingSpeedInput.value = localStorage.getItem("typingSpeed") || 100; }
 function saveOtherSettings() { localStorage.setItem("maxTokens", maxTokensInput.value); localStorage.setItem("TEMPERATURE", temperatureInput.value); localStorage.setItem("model", modelSelect.value); localStorage.setItem("safetyLevel", safetySettingsSelect.value); localStorage.setItem("autoscroll", autoscrollToggle.checked); localStorage.setItem("typingSpeed", typingSpeedInput.value); }
 
-function initializeColorSettings() { /* ... unchanged ... */ }
-const defaultColors = { dark: { '--color-background-primary': '#151e24', '--color-background-secondary': '#1a2733', '--color-background-tertiary': '#283542', '--color-text-primary': '#d1d5db', '--color-accent': '#5f96c8', '--color-text-button': '#0b2469', }, light: { '--color-background-primary': '#f0f6ff', '--color-background-secondary': '#d2e2f7', '--color-background-tertiary': '#f0f6ff', '--color-text-primary': '#0a0a0a', '--color-accent': '#4c7cbe', '--color-text-button': '#edf1f8', } }; function applyColors(colors) { for (const [key, value] of Object.entries(colors)) { document.documentElement.style.setProperty(key, value); } colorPrimaryBgInput.value = colors['--color-background-primary']; colorSecondaryBgInput.value = colors['--color-background-secondary']; colorTertiaryBgInput.value = colors['--color-background-tertiary']; colorPrimaryTextInput.value = colors['--color-text-primary']; colorAccentInput.value = colors['--color-accent']; colorButtonTextInput.value = colors['--color-text-button']; } function saveAndApplyCurrentColors() { const currentColors = { '--color-background-primary': colorPrimaryBgInput.value, '--color-background-secondary': colorSecondaryBgInput.value, '--color-background-tertiary': colorTertiaryBgInput.value, '--color-text-primary': colorPrimaryTextInput.value, '--color-accent': colorAccentInput.value, '--color-text-button': colorButtonTextInput.value, }; localStorage.setItem("customColors", JSON.stringify(currentColors)); applyColors(currentColors); } function loadAndApplyColors() { const savedColors = localStorage.getItem("customColors"); if (savedColors) { applyColors(JSON.parse(savedColors)); } else { const theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; applyColors(defaultColors[theme]); } } function resetColors() { if (confirm("Are you sure you want to reset your custom colors to the theme defaults?")) { localStorage.removeItem("customColors"); window.location.reload(); } } function initializeColorSettings() { if (!colorPrimaryBgInput) return; loadAndApplyColors(); const colorInputs = [colorPrimaryBgInput, colorSecondaryBgInput, colorTertiaryBgInput, colorPrimaryTextInput, colorAccentInput, colorButtonTextInput]; colorInputs.forEach(input => input.addEventListener('input', saveAndApplyCurrentColors)); btnResetColors.addEventListener('click', resetColors); window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => { if (!localStorage.getItem("customColors")) { const newTheme = event.matches ? 'dark' : 'light'; applyColors(defaultColors[newTheme]); } }); }
-
+const defaultColors = { dark: { '--color-background-primary': '#151e24', '--color-background-secondary': '#1a2733', '--color-background-tertiary': '#283542', '--color-text-primary': '#d1d5db', '--color-accent': '#5f96c8', '--color-text-button': '#0b2469', }, light: { '--color-background-primary': '#f0f6ff', '--color-background-secondary': '#d2e2f7', '--color-background-tertiary': '#f0f6ff', '--color-text-primary': '#0a0a0a', '--color-accent': '#4c7cbe', '--color-text-button': '#edf1f8', } };
+function applyColors(colors) { for (const [key, value] of Object.entries(colors)) { document.documentElement.style.setProperty(key, value); } colorPrimaryBgInput.value = colors['--color-background-primary']; colorSecondaryBgInput.value = colors['--color-background-secondary']; colorTertiaryBgInput.value = colors['--color-background-tertiary']; colorPrimaryTextInput.value = colors['--color-text-primary']; colorAccentInput.value = colors['--color-accent']; colorButtonTextInput.value = colors['--color-text-button']; }
+function saveAndApplyCurrentColors() { const currentColors = { '--color-background-primary': colorPrimaryBgInput.value, '--color-background-secondary': colorSecondaryBgInput.value, '--color-background-tertiary': colorTertiaryBgInput.value, '--color-text-primary': colorPrimaryTextInput.value, '--color-accent': colorAccentInput.value, '--color-text-button': colorButtonTextInput.value, }; localStorage.setItem("customColors", JSON.stringify(currentColors)); applyColors(currentColors); }
+function loadAndApplyColors() { const savedColors = localStorage.getItem("customColors"); if (savedColors) { applyColors(JSON.parse(savedColors)); } else { const theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; applyColors(defaultColors[theme]); } }
+function resetColors() { if (confirm("Are you sure you want to reset your custom colors to the theme defaults?")) { localStorage.removeItem("customColors"); window.location.reload(); } }
+function initializeColorSettings() { if (!colorPrimaryBgInput) return; loadAndApplyColors(); const colorInputs = [colorPrimaryBgInput, colorSecondaryBgInput, colorTertiaryBgInput, colorPrimaryTextInput, colorAccentInput, colorButtonTextInput]; colorInputs.forEach(input => input.addEventListener('input', saveAndApplyCurrentColors)); btnResetColors.addEventListener('click', resetColors); window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => { if (!localStorage.getItem("customColors")) { const newTheme = event.matches ? 'dark' : 'light'; applyColors(defaultColors[newTheme]); } }); }
 
 export function getSettings() {
-    // This part now exactly mirrors the Zodiac project's settings object structure
     return {
         apiKey: apiKeys.length > 0 ? apiKeys[activeApiKeyIndex] : null,
         maxTokens: maxTokensInput.value,
@@ -67,9 +74,7 @@ export function getSettings() {
         typingSpeed: typingSpeedInput.value
     }
 }
-
 export function getSystemPrompt() {
-    // This is now an EXACT copy of the Zodiac project's system prompt
     return "If needed, format your answer using markdown. " +
         "Today's date is " + new Date().toDateString() + ". " +
         "You are to act as the personality dictated by the user. " +
