@@ -8,6 +8,7 @@ const btnDeleteKey = document.querySelector("#btn-delete-key");
 const maxTokensInput = document.querySelector("#maxTokens");
 const temperatureInput = document.querySelector("#temperature");
 const modelSelect = document.querySelector("#selectedModel");
+const safetySettingsSelect = document.querySelector("#safetySettings"); // NEW
 const autoscrollToggle = document.querySelector("#autoscroll");
 const typingSpeedInput = document.querySelector("#typingSpeed");
 const colorPrimaryBgInput = document.querySelector("#colorPrimaryBg");
@@ -37,6 +38,7 @@ function setupEventListeners() {
     if (maxTokensInput) maxTokensInput.addEventListener("input", saveOtherSettings);
     if (temperatureInput) temperatureInput.addEventListener("input", saveOtherSettings);
     if (modelSelect) modelSelect.addEventListener("change", saveOtherSettings);
+    if (safetySettingsSelect) safetySettingsSelect.addEventListener("change", saveOtherSettings); // NEW
     if (autoscrollToggle) autoscrollToggle.addEventListener("change", saveOtherSettings);
     if (typingSpeedInput) typingSpeedInput.addEventListener("input", saveOtherSettings);
 }
@@ -114,18 +116,20 @@ function loadOtherSettings() {
     maxTokensInput.value = localStorage.getItem("maxTokens") || 1000;
     temperatureInput.value = localStorage.getItem("TEMPERATURE") || 70;
     modelSelect.value = localStorage.getItem("model") || "gemini-2.5-flash-preview-04-17";
+    safetySettingsSelect.value = localStorage.getItem("safetyLevel") || "risky"; // NEW
     autoscrollToggle.checked = localStorage.getItem("autoscroll") === "true";
-    typingSpeedInput.value = localStorage.getItem("typingSpeed") || 100; // CORRECTED DEFAULT
+    typingSpeedInput.value = localStorage.getItem("typingSpeed") || 100;
 }
 function saveOtherSettings() {
     localStorage.setItem("maxTokens", maxTokensInput.value);
     localStorage.setItem("TEMPERATURE", temperatureInput.value);
     localStorage.setItem("model", modelSelect.value);
+    localStorage.setItem("safetyLevel", safetySettingsSelect.value); // NEW
     localStorage.setItem("autoscroll", autoscrollToggle.checked);
     localStorage.setItem("typingSpeed", typingSpeedInput.value);
 }
 
-// --- Color Scheme ---
+// --- Color Scheme --- (This section remains unchanged)
 const defaultColors = {
     dark: {
         '--color-background-primary': '#151e24',
@@ -144,82 +148,47 @@ const defaultColors = {
         '--color-text-button': '#edf1f8',
     }
 };
-function applyColors(colors) {
-    for (const [key, value] of Object.entries(colors)) {
-        document.documentElement.style.setProperty(key, value);
-    }
-    colorPrimaryBgInput.value = colors['--color-background-primary'];
-    colorSecondaryBgInput.value = colors['--color-background-secondary'];
-    colorTertiaryBgInput.value = colors['--color-background-tertiary'];
-    colorPrimaryTextInput.value = colors['--color-text-primary'];
-    colorAccentInput.value = colors['--color-accent'];
-    colorButtonTextInput.value = colors['--color-text-button'];
-}
-function saveAndApplyCurrentColors() {
-    const currentColors = {
-        '--color-background-primary': colorPrimaryBgInput.value,
-        '--color-background-secondary': colorSecondaryBgInput.value,
-        '--color-background-tertiary': colorTertiaryBgInput.value,
-        '--color-text-primary': colorPrimaryTextInput.value,
-        '--color-accent': colorAccentInput.value,
-        '--color-text-button': colorButtonTextInput.value,
-    };
-    localStorage.setItem("customColors", JSON.stringify(currentColors));
-    applyColors(currentColors);
-}
-function loadAndApplyColors() {
-    const savedColors = localStorage.getItem("customColors");
-    if (savedColors) {
-        applyColors(JSON.parse(savedColors));
-    } else {
-        const theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        applyColors(defaultColors[theme]);
-    }
-}
-function resetColors() {
-    if (confirm("Are you sure you want to reset your custom colors to the theme defaults?")) {
-        localStorage.removeItem("customColors");
-        window.location.reload();
-    }
-}
-function initializeColorSettings() {
-    if (!colorPrimaryBgInput) return;
-    loadAndApplyColors();
-    const colorInputs = [colorPrimaryBgInput, colorSecondaryBgInput, colorTertiaryBgInput, colorPrimaryTextInput, colorAccentInput, colorButtonTextInput];
-    colorInputs.forEach(input => input.addEventListener('input', saveAndApplyCurrentColors));
-    btnResetColors.addEventListener('click', resetColors);
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
-        if (!localStorage.getItem("customColors")) {
-             const newTheme = event.matches ? 'dark' : 'light';
-             applyColors(defaultColors[newTheme]);
-        }
-    });
-}
+function applyColors(colors) { for (const [key, value] of Object.entries(colors)) { document.documentElement.style.setProperty(key, value); } colorPrimaryBgInput.value = colors['--color-background-primary']; colorSecondaryBgInput.value = colors['--color-background-secondary']; colorTertiaryBgInput.value = colors['--color-background-tertiary']; colorPrimaryTextInput.value = colors['--color-text-primary']; colorAccentInput.value = colors['--color-accent']; colorButtonTextInput.value = colors['--color-text-button']; }
+function saveAndApplyCurrentColors() { const currentColors = { '--color-background-primary': colorPrimaryBgInput.value, '--color-background-secondary': colorSecondaryBgInput.value, '--color-background-tertiary': colorTertiaryBgInput.value, '--color-text-primary': colorPrimaryTextInput.value, '--color-accent': colorAccentInput.value, '--color-text-button': colorButtonTextInput.value, }; localStorage.setItem("customColors", JSON.stringify(currentColors)); applyColors(currentColors); }
+function loadAndApplyColors() { const savedColors = localStorage.getItem("customColors"); if (savedColors) { applyColors(JSON.parse(savedColors)); } else { const theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; applyColors(defaultColors[theme]); } }
+function resetColors() { if (confirm("Are you sure you want to reset your custom colors to the theme defaults?")) { localStorage.removeItem("customColors"); window.location.reload(); } }
+function initializeColorSettings() { if (!colorPrimaryBgInput) return; loadAndApplyColors(); const colorInputs = [colorPrimaryBgInput, colorSecondaryBgInput, colorTertiaryBgInput, colorPrimaryTextInput, colorAccentInput, colorButtonTextInput]; colorInputs.forEach(input => input.addEventListener('input', saveAndApplyCurrentColors)); btnResetColors.addEventListener('click', resetColors); window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => { if (!localStorage.getItem("customColors")) { const newTheme = event.matches ? 'dark' : 'light'; applyColors(defaultColors[newTheme]); } }); }
+
 
 // --- Public Functions ---
 export function getSettings() {
     const activeKey = apiKeys.length > 0 ? apiKeys[activeApiKeyIndex] : null;
+    
+    // NEW: Dynamically build safety settings based on the dropdown
+    let safetySettings;
+    const safetyLevel = safetySettingsSelect.value;
+    switch(safetyLevel) {
+        case 'risky':
+            safetySettings = [ { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE }, { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE }, { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE }, { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE } ];
+            break;
+        case 'moderate':
+            safetySettings = [ { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH }, { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH }, { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH }, { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH } ];
+            break;
+        case 'safe':
+        default:
+            safetySettings = [ { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE }, { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE }, { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE }, { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE } ];
+            break;
+    }
+
+    // NEW: Group generation settings together
+    const generationConfig = {
+        maxOutputTokens: parseInt(maxTokensInput.value, 10),
+        temperature: parseFloat(temperatureInput.value) / 100,
+    };
+
     return {
         apiKey: activeKey,
-        maxTokens: maxTokensInput.value,
-        temperature: temperatureInput.value,
-        safetySettings: [
-            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE }
-        ],
+        safetySettings,
+        generationConfig,
         model: modelSelect.value,
         autoscroll: autoscrollToggle.checked,
         typingSpeed: typingSpeedInput.value,
     }
 }
-export function getSystemPrompt() {
-    return "If needed, format your answer using markdown. " +
-        "Today's date is " + new Date().toDateString() + ". " +
-        "You are to act as the personality dictated by the user. " +
-        "Keep a consistent tone no matter what. " +
-        "The first messages you have with the user will dictate that tone. " +
-        "Aggressiveness guidelines: 3 requires constant aggression. Be assertive, direct, attack if unprompted. 2 requires moderate aggression. Don't initiate but reciprocate. Teasing is okay. 1 requires passivity. Gently correct, no arguing. Exception for heavy moral breaches. 0 requires ultimate passivity. No aggression, no opposition, no exceptions. " +
-        "Sensuality guidelines: 3 requires high sensuality. Be very flirtatious and suggestive, initiate sexual topics. 2 requires moderate sensuality. Flirt, be suggestive, but don't initiate sexual topics unless the user does. 1 requires platonic affection only. 0 requires total aversion to sensuality. Do not reciprocate advances.";
-}
+
+export function getSystemPrompt() { return "If needed, format your answer using markdown. Today's date is " + new Date().toDateString() + ". You are to act as the personality dictated by the user. Keep a consistent tone no matter what. The first messages you have with the user will dictate that tone. Aggressiveness guidelines: 3 requires constant aggression. Be assertive, direct, attack if unprompted. 2 requires moderate aggression. Don't initiate but reciprocate. Teasing is okay. 1 requires passivity. Gently correct, no arguing. Exception for heavy moral breaches. 0 requires ultimate passivity. No aggression, no opposition, no exceptions. Sensuality guidelines: 3 requires high sensuality. Be very flirtatious and suggestive, initiate sexual topics. 2 requires moderate sensuality. Flirt, be suggestive, but don't initiate sexual topics unless the user does. 1 requires platonic affection only. 0 requires total aversion to sensuality. Do not reciprocate advances."; }
