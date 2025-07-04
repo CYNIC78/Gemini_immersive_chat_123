@@ -6,14 +6,10 @@ import * as chatsService from "./Chats.service.js";
 import * as helpers from "../utils/helpers.js";
 import * as characterScriptService from "./CharacterScript.service.js";
 
-// --- NEW: Control the speed of the typing effect (milliseconds per word) ---
-const STREAM_DELAY_MS = 50; // Default value, will be overridden by settings
-
 // --- Core Helper Functions ---
 
 function typewriterStream(stream, textElement) {
     const settings = settingsService.getSettings();
-    // Invert the slider value so left is slow and right is fast
     const streamDelay = 150 - Number(settings.typingSpeed); 
 
     return new Promise(async (resolve) => {
@@ -129,7 +125,15 @@ export async function send(msg, db) {
     const ai = new GoogleGenerativeAI(settings.apiKey);
     const mainSystemPrompt = settingsService.getSystemPrompt();
     const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
-    const model = ai.getGenerativeModel({ model: settings.model, systemInstruction: mainSystemPrompt + "\n\n" + characterPrompt });
+    
+    // FIXED: Correctly pass all settings to the model
+    const model = ai.getGenerativeModel({ 
+        model: settings.model, 
+        systemInstruction: mainSystemPrompt + "\n\n" + characterPrompt,
+        safetySettings: settings.safetySettings,
+        generationConfig: settings.generationConfig
+    });
+    
     const result = await model.generateContentStream({ contents });
 
     const modelMessage = await streamAndProcessResponse(result.stream, selectedPersonality, msg);
@@ -157,7 +161,14 @@ async function regenerate(messageIndex, db) {
     const ai = new GoogleGenerativeAI(settings.apiKey);
     const mainSystemPrompt = settingsService.getSystemPrompt();
     const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
-    const model = ai.getGenerativeModel({ model: settings.model, systemInstruction: mainSystemPrompt + "\n\n" + characterPrompt });
+    
+    // FIXED: Correctly pass all settings to the model
+    const model = ai.getGenerativeModel({ 
+        model: settings.model, 
+        systemInstruction: mainSystemPrompt + "\n\n" + characterPrompt,
+        safetySettings: settings.safetySettings,
+        generationConfig: settings.generationConfig
+    });
     
     const result = await model.generateContentStream({ contents });
     
@@ -184,11 +195,10 @@ async function regenerateUserMessage(userMessageIndex, db) {
     const userMessage = currentChat.content[userMessageIndex];
     if (!userMessage) return;
 
-    // Find the AI message that follows the user's message, if it exists
     const modelMessageElement = document.querySelector(`.message[data-index="${userMessageIndex + 1}"]`);
     
     if (modelMessageElement) {
-        modelMessageElement.querySelector('.message-text').innerHTML = ""; // Clear for typing
+        modelMessageElement.querySelector('.message-text').innerHTML = "";
     }
 
     const history = buildContentHistory(currentChat, userMessageIndex + 1);
@@ -197,7 +207,14 @@ async function regenerateUserMessage(userMessageIndex, db) {
     const ai = new GoogleGenerativeAI(settings.apiKey);
     const mainSystemPrompt = settingsService.getSystemPrompt();
     const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
-    const model = ai.getGenerativeModel({ model: settings.model, systemInstruction: mainSystemPrompt + "\n\n" + characterPrompt });
+
+    // FIXED: Correctly pass all settings to the model
+    const model = ai.getGenerativeModel({ 
+        model: settings.model, 
+        systemInstruction: mainSystemPrompt + "\n\n" + characterPrompt,
+        safetySettings: settings.safetySettings,
+        generationConfig: settings.generationConfig
+    });
 
     const result = await model.generateContentStream({ contents });
     
@@ -207,11 +224,9 @@ async function regenerateUserMessage(userMessageIndex, db) {
     let modelMessage = currentChat.content[modelMessageIndex];
     
     if (modelMessage && modelMessage.role === 'model') {
-        // Add to existing message's versions
         modelMessage.versions.push(newVersionData.versions[0]);
         modelMessage.activeVersion = modelMessage.versions.length - 1;
     } else {
-        // Insert a new message if one didn't exist
         currentChat.content.splice(modelMessageIndex, 0, newVersionData);
     }
     
