@@ -110,9 +110,9 @@
                                     info
                                 </span> </label>
                             <select id="selectedModel" class="input-field">
-                                <option value="gemini-2.0-flash-lite">Flash Lite</option>
-                                <option value="gemini-2.5-flash-preview-04-17" selected="true">Flash</option>
-                                <option value="gemini-2.5-pro-preview-05-06">Pro</option>
+                                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                                <option value="gemini-2.5-flash-preview-04-17" selected="true">Gemini 2.5 Flash Preview 0417</option>
+                                <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
                             </select>
                         </div>
                         <div>
@@ -161,10 +161,25 @@
                         </div>
                     </div>
                     <h3>User Experience</h3>
-                    <div>
-                         <div style="display: flex; gap: 0.25rem; align-items: center;">
+                    <div class="setting-group">
+                         <div class="setting-row-small">
                             <input id="autoscroll" type="checkbox" name="autoscrollEnabled"></input>
                             <label for="autoscroll">Autoscroll</label>
+                        </div>
+                        <div class="setting-row-small" style="margin-top: 1rem;">
+                            <label class="setting-label" for="typingSpeed">
+                                <span>Typing Speed</span>
+                                <span class="material-symbols-outlined tooltip" 
+                                style="font-size: 0.885rem; opacity: 0.6; cursor:default"
+                                info="Controls the delay between words for the typing effect. Slower is on the left, faster is on the right.">
+                                    info
+                                </span> 
+                            </label>
+                            <div class="btn-array">
+                                <!-- CORRECTED MIN AND MAX VALUES -->
+                                <input type="range" min="0" max="150" id="typingSpeed" class="slider">
+                                <label id="label-typingSpeed">50ms</label>
+                            </div>
                         </div>
                     </div>
 
@@ -220,8 +235,8 @@
 
 
             <div class="credits">
-                Made by fætalize
-                <a href="https://github.com/faetalize/zodiac">Source Code</a>
+                Made by CYNIC
+                <a href="https://github.com/CYNIC78/Gemini_immersive_chat_123">Source Code</a>
             </div>
         </div>
         

@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { marked } from "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js";
 import * as settingsService from "./Settings.service.js";
 import * as personalityService from "./Personality.service.js";
@@ -6,46 +6,91 @@ import * as chatsService from "./Chats.service.js";
 import * as helpers from "../utils/helpers.js";
 import * as characterScriptService from "./CharacterScript.service.js";
 
-// --- Helper Functions ---
+// --- Core Helper Functions ---
 
-function createTypingIndicator(personality) {
-    const indicator = document.createElement("div");
-    indicator.classList.add("message", "message-model", "message-typing");
-    const defaultAvatar = personalityService.findDefaultAvatar(personality);
-    indicator.innerHTML = `
-        <div class="message-header">
-            <img class="pfp" src="${defaultAvatar}" loading="lazy">
-            <h3 class="message-role">${personality.name}</h3>
-        </div>
-        <div class="message-text"><i>Typing...</i></div>
-    `;
-    return indicator;
-}
+function typewriterStream(stream, textElement) {
+    const settings = settingsService.getSettings();
+    const streamDelay = 150 - Number(settings.typingSpeed); 
 
-async function streamResponseToText(netStream) {
-    let rawText = "";
-    try {
-        for await (const chunk of netStream) {
-            rawText += chunk.text();
+    return new Promise(async (resolve) => {
+        let wordBuffer = [];
+        let fullText = "";
+        let isStreaming = true;
+
+        const writer = setInterval(() => {
+            if (wordBuffer.length > 0) {
+                fullText += wordBuffer.shift() + " ";
+                textElement.innerHTML = marked.parse(fullText, { breaks: true });
+                helpers.messageContainerScrollToBottom();
+            } else if (!isStreaming) {
+                clearInterval(writer);
+                hljs.highlightAll();
+                resolve(fullText);
+            }
+        }, streamDelay);
+
+        try {
+            for await (const chunk of stream) {
+                const words = chunk.text().split(/\s+/).filter(Boolean);
+                wordBuffer.push(...words);
+            }
+        } catch (error) {
+            console.error("Stream error:", error);
+            textElement.innerHTML += `<br><br><strong style='color:red;'>Error during stream. Check console (F12).</strong>`;
+        } finally {
+            isStreaming = false;
         }
-        return rawText;
-    } catch (error) {
-        console.error("Stream error:", error);
-        return rawText + `\n<br><br><strong style='color:red;'>Error: Could not get response from model. See console (F12) for details.</strong>`;
-    }
+    });
 }
 
-// --- End of Helper Functions ---
+
+async function streamAndProcessResponse(stream, personality, userMessage, targetElement = null) {
+    let placeholder = targetElement;
+    if (!placeholder) {
+        placeholder = await insertMessage({ role: 'model', versions: [{text:''}] }, -1, null, personality);
+    }
+    const textElement = placeholder.querySelector('.message-text');
+    
+    const rawText = await typewriterStream(stream, textElement);
+
+    let modifiedText = rawText;
+    let finalImage = personalityService.findDefaultAvatar(personality);
+
+    if (personality.customScript && personality.customScript.trim() !== "") {
+        const scriptResult = await characterScriptService.execute(personality.customScript, personality, rawText, userMessage);
+        modifiedText = scriptResult.modelResponse;
+        
+        if (scriptResult.character && scriptResult.character.image) {
+            finalImage = scriptResult.character.image;
+            const characterCard = document.querySelector(`#personality-${personality.id}`);
+            if (characterCard) {
+                const cardImage = characterCard.querySelector('.background-img');
+                if (cardImage) cardImage.src = finalImage;
+            }
+        }
+    }
+
+    placeholder.querySelector('.pfp').src = finalImage;
+    textElement.innerHTML = marked.parse(modifiedText, { breaks: true });
+    hljs.highlightAll();
+
+    return {
+        role: "model",
+        personality: personality.name,
+        personalityid: personality.id,
+        versions: [{ text: modifiedText }],
+        activeVersion: 0,
+    };
+}
 
 
 function buildContentHistory(chat, stoppingIndex = null) {
     const contentToProcess = stoppingIndex ? chat.content.slice(0, stoppingIndex) : chat.content;
     const history = [];
-    
     for (const msg of contentToProcess) {
-         if (msg.role === "model") {
+        if (msg.role === "model") {
             const text = msg.versions[msg.activeVersion].text;
-            history.push({ role: "model", parts: [{ text: text }] });
+            history.push({ role: "model", parts: [{ text }] });
         } else {
             history.push({ role: "user", parts: [{ text: msg.parts[0].text }] });
         }
@@ -53,232 +98,144 @@ function buildContentHistory(chat, stoppingIndex = null) {
     return history;
 }
 
-export async function generateFirstMessage(db) {
-    const settings = settingsService.getSettings();
-    const selectedPersonality = await personalityService.getSelected();
-    let currentChat = await chatsService.getCurrentChat(db);
-
-    if (!selectedPersonality || !settings.apiKey || !currentChat || !selectedPersonality.firstMessagePrompt) {
-        return;
-    }
-
-    const typingIndicator = createTypingIndicator(selectedPersonality);
-    document.querySelector(".message-container").append(typingIndicator);
-    helpers.messageContainerScrollToBottom();
-
-    let firstMessageUserContent = selectedPersonality.firstMessagePrompt;
-    if (selectedPersonality.scenario && selectedPersonality.scenario.trim() !== "") {
-        firstMessageUserContent = `Scenario: ${selectedPersonality.scenario}\n\nInstructions: ${firstMessageUserContent}`;
-    }
-
-    const ai = new GoogleGenerativeAI(settings.apiKey);
-    const mainSystemPrompt = settingsService.getSystemPrompt();
-    const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
-    const fullSystemInstruction = mainSystemPrompt + "\n\n" + characterPrompt;
-    
-    const model = ai.getGenerativeModel({ model: settings.model, systemInstruction: fullSystemInstruction });
-    const contents = [{ role: 'user', parts: [{ text: firstMessageUserContent }] }];
-    const result = await model.generateContentStream({ contents });
-    
-    const rawText = await streamResponseToText(result.stream);
-    typingIndicator.remove();
-
-    let modifiedText = rawText;
-    let displayPersonality = { ...selectedPersonality, image: personalityService.findDefaultAvatar(selectedPersonality) };
-
-    if (selectedPersonality.customScript && selectedPersonality.customScript.trim() !== "") {
-        const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, firstMessageUserContent);
-        modifiedText = scriptResult.modelResponse;
-        const finalImage = scriptResult.character.image || personalityService.findDefaultAvatar(selectedPersonality);
-        displayPersonality = { ...selectedPersonality, image: finalImage };
-
-        if (scriptResult.character && scriptResult.character.image) {
-            const characterCard = document.querySelector(`#personality-${selectedPersonality.id}`);
-            if (characterCard) {
-                const cardImage = characterCard.querySelector('.background-img');
-                if (cardImage) cardImage.src = scriptResult.character.image;
-            }
-        }
-    }
-
-    const modelMessage = {
-        role: "model",
-        personality: selectedPersonality.name,
-        personalityid: selectedPersonality.id,
-        versions: [{ text: modifiedText }],
-        activeVersion: 0
-    };
-
-    currentChat.content.push(modelMessage);
-    await db.chats.put(currentChat);
-    
-    await insertMessage(modelMessage, currentChat.content.length - 1, db, displayPersonality);
-    helpers.messageContainerScrollToBottom();
-}
-
 export async function send(msg, db) {
     const settings = settingsService.getSettings();
     const selectedPersonality = await personalityService.getSelected();
     if (!selectedPersonality || !settings.apiKey || !msg) return;
 
-    const ai = new GoogleGenerativeAI(settings.apiKey);
-    
     let currentChat = await chatsService.getCurrentChat(db);
     if (!currentChat) {
+        const ai = new GoogleGenerativeAI(settings.apiKey);
         const titleModel = ai.getGenerativeModel({ model: settings.model });
-        const titleResult = await titleModel.generateContent(`You are a title generator. Your ONLY job is to create a short, concise title (6 words max) for a chat that starts with the following message. Do NOT add any extra text, conversation, greetings, or quotation marks. ONLY reply with the title itself. Message: "${msg}"`);
-        const title = titleResult.response.text();
-        const id = await chatsService.addChat(title, null, db);
+        const titleResult = await titleModel.generateContent(`Create a short, concise title (6 words max) for a chat that starts with this message. Do NOT add extra text or quotes. Message: "${msg}"`);
+        const id = await chatsService.addChat(titleResult.response.text(), null, db);
         document.querySelector(`#chat${id}`).click();
         currentChat = await chatsService.getCurrentChat(db);
     }
     
-    let apiMsg = msg;
-    if (selectedPersonality.reminder && selectedPersonality.reminder.trim() !== "") {
-        apiMsg = `${msg}\n\n${selectedPersonality.reminder}`;
-    }
-
-    const history = buildContentHistory(currentChat);
-    const contents = [...history, { role: 'user', parts: [{ text: apiMsg }] }];
-
     const userMessage = { role: "user", parts: [{ text: msg }] };
     currentChat.content.push(userMessage);
     await insertMessage(userMessage, currentChat.content.length - 1, db);
     helpers.messageContainerScrollToBottom();
-    
-    const typingIndicator = createTypingIndicator(selectedPersonality);
-    document.querySelector(".message-container").append(typingIndicator);
-    helpers.messageContainerScrollToBottom();
 
+    let apiMsg = selectedPersonality.reminder ? `${msg}\n\n${selectedPersonality.reminder}` : msg;
+    const history = buildContentHistory(currentChat);
+    const contents = [...history, { role: 'user', parts: [{ text: apiMsg }] }];
+    
+    const ai = new GoogleGenerativeAI(settings.apiKey);
     const mainSystemPrompt = settingsService.getSystemPrompt();
     const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
-    const fullSystemInstruction = mainSystemPrompt + "\n\n" + characterPrompt;
     
-    const model = ai.getGenerativeModel({ model: settings.model, systemInstruction: fullSystemInstruction });
+    // FIXED: Correctly pass all settings to the model
+    const model = ai.getGenerativeModel({ 
+        model: settings.model, 
+        systemInstruction: mainSystemPrompt + "\n\n" + characterPrompt,
+        safetySettings: settings.safetySettings,
+        generationConfig: settings.generationConfig
+    });
+    
     const result = await model.generateContentStream({ contents });
+
+    const modelMessage = await streamAndProcessResponse(result.stream, selectedPersonality, msg);
     
-    const rawText = await streamResponseToText(result.stream);
-    typingIndicator.remove();
-
-    let modifiedText = rawText;
-    let displayPersonality = { ...selectedPersonality, image: personalityService.findDefaultAvatar(selectedPersonality) };
-
-    if (selectedPersonality.customScript && selectedPersonality.customScript.trim() !== "") {
-        const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, msg);
-        modifiedText = scriptResult.modelResponse;
-        const finalImage = scriptResult.character.image || personalityService.findDefaultAvatar(selectedPersonality);
-        displayPersonality = { ...selectedPersonality, image: finalImage };
-        
-        if (scriptResult.character && scriptResult.character.image) {
-            const characterCard = document.querySelector(`#personality-${selectedPersonality.id}`);
-            if (characterCard) {
-                const cardImage = characterCard.querySelector('.background-img');
-                if (cardImage) cardImage.src = scriptResult.character.image;
-            }
-        }
-    }
-
-    const modelMessage = {
-        role: "model",
-        personality: selectedPersonality.name,
-        personalityid: selectedPersonality.id,
-        versions: [{ text: modifiedText }],
-        activeVersion: 0
-    };
-
     currentChat.content.push(modelMessage);
     await db.chats.put(currentChat);
-    
-    await insertMessage(modelMessage, currentChat.content.length - 1, db, displayPersonality);
-    helpers.messageContainerScrollToBottom();
+    await chatsService.loadChat(currentChat.id, db);
 }
 
 async function regenerate(messageIndex, db) {
     const settings = settingsService.getSettings();
     const selectedPersonality = await personalityService.getSelected();
     let currentChat = await chatsService.getCurrentChat(db);
-    let contents = [];
-    let userMessageText = "";
-
-    const messageElement = document.querySelector(`.message[data-index="${messageIndex}"]`);
-    messageElement.querySelector('.message-text').innerHTML = "<i>Regenerating...</i>";
-
-    if (messageIndex === 0) {
-        let firstMessageUserContent = selectedPersonality.firstMessagePrompt;
-        if (selectedPersonality.scenario && selectedPersonality.scenario.trim() !== "") {
-            firstMessageUserContent = `Scenario: ${selectedPersonality.scenario}\n\nInstructions: ${firstMessageUserContent}`;
-        }
-        contents = [{ role: 'user', parts: [{ text: firstMessageUserContent }] }];
-        userMessageText = firstMessageUserContent;
-    } else {
-        const originalUserMsgText = currentChat.content[messageIndex - 1].parts[0].text;
-        userMessageText = originalUserMsgText;
-        let apiMsg = originalUserMsgText;
-        if (selectedPersonality.reminder && selectedPersonality.reminder.trim() !== "") {
-            apiMsg = `${originalUserMsgText}\n\n${selectedPersonality.reminder}`;
-        }
-        const history = buildContentHistory(currentChat, messageIndex - 1);
-        contents = [...history, { role: 'user', parts: [{ text: apiMsg }] }];
-    }
     
-    const mainSystemPrompt = settingsService.getSystemPrompt();
-    const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
-    const fullSystemInstruction = mainSystemPrompt + "\n\n" + characterPrompt;
+    const messageElement = document.querySelector(`.message[data-index="${messageIndex}"]`);
+    messageElement.querySelector('.message-text').innerHTML = ""; 
+    
+    const userMessageText = messageIndex === 0 
+        ? (selectedPersonality.firstMessagePrompt || "")
+        : currentChat.content[messageIndex - 1].parts[0].text;
+    
+    const history = buildContentHistory(currentChat, messageIndex);
+    const contents = [...history, { role: 'user', parts: [{ text: userMessageText }] }];
 
     const ai = new GoogleGenerativeAI(settings.apiKey);
-    const model = ai.getGenerativeModel({ model: settings.model, systemInstruction: fullSystemInstruction });
-
+    const mainSystemPrompt = settingsService.getSystemPrompt();
+    const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
+    
+    // FIXED: Correctly pass all settings to the model
+    const model = ai.getGenerativeModel({ 
+        model: settings.model, 
+        systemInstruction: mainSystemPrompt + "\n\n" + characterPrompt,
+        safetySettings: settings.safetySettings,
+        generationConfig: settings.generationConfig
+    });
+    
     const result = await model.generateContentStream({ contents });
-    const rawText = await streamResponseToText(result.stream);
     
-    let modifiedText = rawText;
-    let finalImage = personalityService.findDefaultAvatar(selectedPersonality);
-    
-    if (selectedPersonality.customScript && selectedPersonality.customScript.trim() !== "") {
-        const scriptResult = await characterScriptService.execute(selectedPersonality.customScript, selectedPersonality, rawText, userMessageText);
-        modifiedText = scriptResult.modelResponse;
-        
-        if (scriptResult.character && scriptResult.character.image) {
-            finalImage = scriptResult.character.image;
-            // *** NEW LOGIC HERE ***
-            // Only update the main sidebar card if this is the LAST message.
-            const isLastMessage = messageIndex === currentChat.content.length - 1;
-            if (isLastMessage) {
-                const characterCard = document.querySelector(`#personality-${selectedPersonality.id}`);
-                if (characterCard) {
-                    const cardImage = characterCard.querySelector('.background-img');
-                    if (cardImage) cardImage.src = finalImage;
-                }
-            }
-        }
-    }
+    const newVersionData = await streamAndProcessResponse(result.stream, selectedPersonality, userMessageText, messageElement);
 
     const modelMessage = currentChat.content[messageIndex];
-    modelMessage.versions.push({ text: modifiedText });
+    modelMessage.versions.push(newVersionData.versions[0]);
     modelMessage.activeVersion = modelMessage.versions.length - 1;
     await db.chats.put(currentChat);
-
-    const pfpElement = messageElement.querySelector('.pfp');
-    const textElement = messageElement.querySelector('.message-text');
-    const swiperElement = messageElement.querySelector('.version-swiper');
     
-    pfpElement.src = finalImage;
-    textElement.innerHTML = marked.parse(modifiedText, { breaks: true });
-    hljs.highlightAll();
-
+    const swiperElement = messageElement.querySelector('.version-swiper span');
     if (swiperElement) {
-        swiperElement.querySelector('span').textContent = `${modelMessage.activeVersion + 1}/${modelMessage.versions.length}`;
+        swiperElement.textContent = `${modelMessage.activeVersion + 1}/${modelMessage.versions.length}`;
     } else {
         await chatsService.loadChat(currentChat.id, db);
     }
 }
 
 async function regenerateUserMessage(userMessageIndex, db) {
-    // This logic can also be improved, but let's focus on the main regenerate first.
-    // For now, reloading the chat is the safest way to handle this complex case.
-    await chatsService.loadChat(chatsService.getCurrentChatId(), db);
-    // The rest of this function will now use the reloaded data, ensuring consistency.
+    const settings = settingsService.getSettings();
+    const selectedPersonality = await personalityService.getSelected();
+    let currentChat = await chatsService.getCurrentChat(db);
+
+    const userMessage = currentChat.content[userMessageIndex];
+    if (!userMessage) return;
+
+    const modelMessageElement = document.querySelector(`.message[data-index="${userMessageIndex + 1}"]`);
+    
+    if (modelMessageElement) {
+        modelMessageElement.querySelector('.message-text').innerHTML = "";
+    }
+
+    const history = buildContentHistory(currentChat, userMessageIndex + 1);
+    const contents = history;
+
+    const ai = new GoogleGenerativeAI(settings.apiKey);
+    const mainSystemPrompt = settingsService.getSystemPrompt();
+    const characterPrompt = `You are to act as the following character: ${selectedPersonality.name}. Description: ${selectedPersonality.description}. Core Instructions: ${selectedPersonality.prompt}`;
+
+    // FIXED: Correctly pass all settings to the model
+    const model = ai.getGenerativeModel({ 
+        model: settings.model, 
+        systemInstruction: mainSystemPrompt + "\n\n" + characterPrompt,
+        safetySettings: settings.safetySettings,
+        generationConfig: settings.generationConfig
+    });
+
+    const result = await model.generateContentStream({ contents });
+    
+    const newVersionData = await streamAndProcessResponse(result.stream, selectedPersonality, userMessage.parts[0].text, modelMessageElement);
+    
+    const modelMessageIndex = userMessageIndex + 1;
+    let modelMessage = currentChat.content[modelMessageIndex];
+    
+    if (modelMessage && modelMessage.role === 'model') {
+        modelMessage.versions.push(newVersionData.versions[0]);
+        modelMessage.activeVersion = modelMessage.versions.length - 1;
+    } else {
+        currentChat.content.splice(modelMessageIndex, 0, newVersionData);
+    }
+    
+    await db.chats.put(currentChat);
+    await chatsService.loadChat(currentChat.id, db);
 }
+
+
+// --- The rest of the file remains largely the same ---
 
 export async function insertMessage(msgObj, index, db, personality = null) {
     const newMessage = document.createElement("div");
@@ -326,7 +283,7 @@ export async function insertMessage(msgObj, index, db, personality = null) {
             newMessage.querySelector(".btn-version-next").addEventListener("click", () => switchVersion(index, 1, db));
         }
 
-    } else { // User message
+    } else {
         newMessage.classList.add("message-user");
         newMessage.innerHTML = `
             <div class="message-header"><h3 class="message-role">You</h3><div class="message-actions">
