@@ -34,7 +34,7 @@
     --color-api-error: #ff4a53;
 }
 
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,200;0,400;0,800;1,200;1,400;1,800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Product+Sans&family=Google+Sans+Display:ital@0;1&family=Google+Sans:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Material+Symbols+Outlined&family=Space+Mono&display=swap');
 
 @font-face {
@@ -70,7 +70,7 @@ img { opacity: 0; }
 img[src]:not([src=""]):not([src="undefined"]):not([src="null"]) { opacity: 1; }
 
 body {
-    font-family: 'Noto Sans', sans-serif;
+    font-family: 'Inter', sans-serif;
     overflow: hidden;
     margin: 0;
     background-color: var(--color-background-primary);
